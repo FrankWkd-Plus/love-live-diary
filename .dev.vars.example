@@ -1,0 +1,6 @@
+# 复制为 .dev.vars 可在本地覆盖 wrangler.toml 的 [vars]
+DIARY_PIN=123456
+PAGE_TITLE=我们的小本本
+PERSON_A=小A
+PERSON_B=小B
+SESSION_SECRET=local-dev-secret-change-me

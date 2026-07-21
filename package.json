@@ -1,13 +1,16 @@
 {
-  "name": "shared-diary",
+  "name": "love-live-diary",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250525.0",
+    "typescript": "^5.8.3",
     "wrangler": "^3.114.0"
   }
 }

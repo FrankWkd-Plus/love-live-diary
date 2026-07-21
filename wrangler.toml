@@ -1,17 +1,22 @@
-name = "shared-diary"
+name = "love-live-diary"
 main = "src/worker.ts"
 compatibility_date = "2025-05-01"
 
-# R2 binding — 在 Cloudflare 控制台创建桶 diary-data 后，改成你的桶名
+# R2 binding — 在 Cloudflare 控制台创建桶 diary-data 后确认桶名一致
 [[r2_buckets]]
-binding_name = "DIARY_BUCKET"
+binding = "DIARY_BUCKET"
 bucket_name = "diary-data"
 
-# 默认 PIN。忘记密码就改这里再 deploy。
-# 仅作单 PIN MVP；复杂度由用户自己保证。
+# 默认配置。改完后 re-deploy 生效。
+# DIARY_PIN: 进入双人空间的共享 PIN
+# PERSON_A / PERSON_B: 两位作者显示名
+# SESSION_SECRET: 会话签名密钥，部署前请改成随机字符串
 [vars]
 DIARY_PIN = "123456"
 PAGE_TITLE = "我们的小本本"
+PERSON_A = "小A"
+PERSON_B = "小B"
+SESSION_SECRET = "change-me-to-a-long-random-string"
 
 [observability]
 enabled = true
