@@ -386,7 +386,11 @@ export function adminHtml(cfg: ResolvedConfig): string {
     showPins: {},
   };
 
-  const $ = (id) => document.getElementById(id);
+  const $ = (id) => {
+    const el = document.getElementById(id);
+    if (!el) throw new Error("缺少页面元素 #" + id);
+    return el;
+  };
 
   async function api(path, opts = {}) {
     const res = await fetch(path, {
@@ -415,17 +419,18 @@ export function adminHtml(cfg: ResolvedConfig): string {
       .replace(/"/g, "&quot;");
   }
 
-  $("login-btn").addEventListener("click", doLogin);
-  $("admin-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
-  $("logout-btn").addEventListener("click", async () => {
-    try { await api("/api/admin/logout", { method: "POST", body: "{}" }); } catch {}
-    location.reload();
-  });
+  function setLoginError(msg) {
+    const el = document.getElementById("login-error");
+    if (el) el.textContent = msg || "";
+  }
 
   async function doLogin() {
-    $("login-error").textContent = "";
-    const password = $("admin-pass").value;
-    if (!password) { $("login-error").textContent = "请输入密码"; return; }
+    setLoginError("");
+    const passEl = document.getElementById("admin-pass");
+    const password = passEl ? passEl.value : "";
+    if (!password) { setLoginError("请输入密码"); return; }
+    const btn = document.getElementById("login-btn");
+    if (btn) btn.disabled = true;
     try {
       await api("/api/admin/login", {
         method: "POST",
@@ -433,19 +438,22 @@ export function adminHtml(cfg: ResolvedConfig): string {
       });
       await enterApp();
     } catch (e) {
-      $("login-error").textContent = e.message || "登录失败";
+      setLoginError((e && e.message) || "登录失败");
+    } finally {
+      if (btn) btn.disabled = false;
     }
   }
 
   async function bootstrap() {
     try {
       const me = await api("/api/admin/me");
-      if (me.authenticated) {
+      if (me && me.authenticated) {
         await enterApp();
         return;
       }
     } catch {}
-    $("login").classList.remove("hidden");
+    const login = document.getElementById("login");
+    if (login) login.classList.remove("hidden");
   }
 
   async function enterApp() {
@@ -454,6 +462,16 @@ export function adminHtml(cfg: ResolvedConfig): string {
     resetSessionForm();
     await refreshSessions();
   }
+
+  // Bind login controls as early as possible (before later code can throw).
+  document.getElementById("login-btn")?.addEventListener("click", doLogin);
+  document.getElementById("admin-pass")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doLogin();
+  });
+  document.getElementById("logout-btn")?.addEventListener("click", async () => {
+    try { await api("/api/admin/logout", { method: "POST", body: "{}" }); } catch {}
+    location.reload();
+  });
 
   function currentSession() {
     return state.sessions.find((s) => s.id === state.currentSessionId) || null;
@@ -627,11 +645,13 @@ export function adminHtml(cfg: ResolvedConfig): string {
   async function removeSession(sessionId, label) {
     if (!sessionId) return;
     const name = label || sessionId;
+    // Note: this script lives inside a TS template literal — use \\n so the
+    // emitted client JS keeps a real "\\n" escape (a bare \\n would break parse).
     if (
       !confirm(
         "确定删除会话「" +
           name +
-          "」？\n将永久清除该会话的全部日记页与批注，且无法恢复。",
+          "」？\\n将永久清除该会话的全部日记页与批注，且无法恢复。",
       )
     ) {
       return;
