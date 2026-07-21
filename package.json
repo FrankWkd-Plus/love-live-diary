@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "push": "bash scripts/push.sh"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",

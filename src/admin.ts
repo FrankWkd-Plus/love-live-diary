@@ -25,8 +25,8 @@ export function adminHtml(cfg: ResolvedConfig): string {
 <title>${title}</title>
 <style>
   :root {
-    --bg: #0f1218;
-    --panel: #171c25;
+    --bg: #0c1017;
+    --panel: #151b26;
     --ink: #e8edf5;
     --muted: #8b95a8;
     --line: #2a3344;
@@ -35,21 +35,27 @@ export function adminHtml(cfg: ResolvedConfig): string {
     --ok: #3fb950;
     --a: #79c0ff;
     --b: #d2a8ff;
-    --radius: 12px;
+    --radius: 14px;
+    --shadow: 0 16px 40px rgba(0,0,0,0.28);
     --ui: "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     min-height: 100vh;
-    background: radial-gradient(900px 500px at 10% -10%, #1b2740 0%, transparent 55%), var(--bg);
+    background:
+      radial-gradient(900px 520px at 8% -12%, #1e2d4d 0%, transparent 55%),
+      radial-gradient(700px 400px at 100% 0%, #2a1f3d 0%, transparent 45%),
+      var(--bg);
     color: var(--ink);
     font-family: var(--ui);
+    -webkit-font-smoothing: antialiased;
   }
   button, input, textarea { font: inherit; color: inherit; }
   button { cursor: pointer; border: none; background: none; }
   .hidden { display: none !important; }
-  a { color: var(--accent); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
 
   #login {
     min-height: 100vh;
@@ -59,39 +65,58 @@ export function adminHtml(cfg: ResolvedConfig): string {
   }
   .card {
     width: min(420px, 100%);
-    background: var(--panel);
+    background: rgba(21,27,38,0.92);
     border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 28px;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
   }
-  h1 { margin: 0 0 6px; font-size: 22px; }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--a), var(--accent), var(--b));
+  }
+  h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: 0.01em; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
   label {
     display: block;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--muted);
     margin-bottom: 6px;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
   }
   input, textarea {
     width: 100%;
     background: #0d1118;
     border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 11px 12px;
+    border-radius: 12px;
+    padding: 12px 13px;
     outline: none;
+    transition: border-color .15s, box-shadow .15s;
   }
-  input:focus, textarea:focus { border-color: var(--accent); }
+  input:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(110,168,254,0.15);
+  }
   .field { margin-bottom: 14px; }
   .primary {
     width: 100%;
-    background: var(--accent);
+    background: linear-gradient(180deg, #82b6ff, var(--accent));
     color: #0b1220;
     font-weight: 700;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 12px;
     margin-top: 4px;
+    transition: opacity .15s, transform .1s;
   }
+  .primary:hover { opacity: 0.95; }
+  .primary:active { transform: scale(0.99); }
   .error { color: var(--danger); font-size: 13px; min-height: 1.2em; margin-top: 8px; }
   .ok { color: var(--ok); font-size: 13px; }
 
@@ -102,22 +127,26 @@ export function adminHtml(cfg: ResolvedConfig): string {
     gap: 12px;
     padding: 14px 18px;
     border-bottom: 1px solid var(--line);
-    background: rgba(23,28,37,0.9);
+    background: rgba(21,27,38,0.88);
+    backdrop-filter: blur(12px);
     position: sticky;
     top: 0;
     z-index: 5;
   }
   header h1 { font-size: 16px; margin: 0; flex: 1; }
+  header h1::before { content: "📓 "; }
   .ghost {
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 7px 12px;
     font-size: 13px;
     background: transparent;
     color: var(--ink);
+    transition: border-color .15s, background .15s;
   }
-  .ghost:hover { border-color: var(--accent); }
+  .ghost:hover { border-color: var(--accent); background: rgba(110,168,254,0.08); }
   .danger { color: var(--danger); border-color: #5a2a2a; }
+  .danger:hover { background: rgba(255,123,114,0.08); border-color: #7a3530; }
 
   .layout {
     display: grid;
@@ -145,11 +174,12 @@ export function adminHtml(cfg: ResolvedConfig): string {
     text-transform: uppercase;
   }
   .panel {
-    background: var(--panel);
+    background: rgba(21,27,38,0.92);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 16px;
+    padding: 18px;
     margin-bottom: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
@@ -160,15 +190,20 @@ export function adminHtml(cfg: ResolvedConfig): string {
   .session-list li button, .page-list li button {
     width: 100%;
     text-align: left;
-    padding: 10px 12px;
-    border-radius: 10px;
+    padding: 11px 12px;
+    border-radius: 12px;
     border: 1px solid transparent;
     margin-bottom: 6px;
+    transition: background .15s, border-color .15s, transform .1s;
   }
-  .session-list li button:hover, .page-list li button:hover { background: #121722; }
-  .session-list li button.active, .page-list li button.active {
-    border-color: var(--line);
+  .session-list li button:hover, .page-list li button:hover {
     background: #121722;
+    border-color: rgba(42,51,68,0.8);
+  }
+  .session-list li button.active, .page-list li button.active {
+    border-color: rgba(110,168,254,0.35);
+    background: linear-gradient(180deg, #172033, #121722);
+    box-shadow: 0 0 0 1px rgba(110,168,254,0.08);
   }
   .t { font-weight: 600; font-size: 14px; }
   .d { color: var(--muted); font-size: 12px; margin-top: 2px; }

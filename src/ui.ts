@@ -30,11 +30,11 @@ export function appHtml(cfg: ResolvedConfig): string {
 <title>${title}</title>
 <style>
   :root {
-    --bg: #f6f1ea;
+    --bg: #f3ebe2;
     --bg-elev: #fffdf9;
     --ink: #2a241c;
     --muted: #7a6f62;
-    --line: #e6dccf;
+    --line: #e4d8c8;
     --accent: #c45c4a;
     --accent-soft: #f3d6cf;
     --a: #3d6b8c;
@@ -43,8 +43,9 @@ export function appHtml(cfg: ResolvedConfig): string {
     --b-soft: #e5dff0;
     --mark: #ffe08a;
     --mark-active: #ffc94a;
-    --shadow: 0 10px 30px rgba(42, 36, 28, 0.08);
-    --radius: 16px;
+    --shadow: 0 18px 50px rgba(42, 36, 28, 0.10);
+    --shadow-sm: 0 6px 18px rgba(42, 36, 28, 0.06);
+    --radius: 18px;
     --font: "Iowan Old Style", "Palatino Linotype", "Songti SC", "Noto Serif SC", Georgia, serif;
     --ui: "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
   }
@@ -54,8 +55,9 @@ export function appHtml(cfg: ResolvedConfig): string {
     margin: 0;
     color: var(--ink);
     background:
-      radial-gradient(1200px 600px at 10% -10%, #fff8ef 0%, transparent 60%),
-      radial-gradient(900px 500px at 100% 0%, #f0e7ff 0%, transparent 55%),
+      radial-gradient(1000px 520px at 8% -8%, #fff6ea 0%, transparent 58%),
+      radial-gradient(820px 480px at 100% 0%, #efe6ff 0%, transparent 52%),
+      radial-gradient(700px 400px at 50% 100%, #f7e8e2 0%, transparent 50%),
       var(--bg);
     font-family: var(--ui);
     -webkit-font-smoothing: antialiased;
@@ -73,99 +75,137 @@ export function appHtml(cfg: ResolvedConfig): string {
     min-height: 100%;
     display: grid;
     place-items: center;
-    padding: 24px;
+    padding: 28px 20px;
+    position: relative;
+  }
+  #login::before {
+    content: "📓";
+    position: absolute;
+    top: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 42px;
+    filter: drop-shadow(0 8px 20px rgba(42,36,28,0.12));
+    opacity: 0.9;
+    pointer-events: none;
   }
   .login-card {
     width: min(420px, 100%);
-    background: var(--bg-elev);
-    border: 1px solid var(--line);
-    border-radius: 24px;
+    background: rgba(255,253,249,0.92);
+    border: 1px solid rgba(228,216,200,0.9);
+    border-radius: 28px;
     box-shadow: var(--shadow);
-    padding: 36px 32px 28px;
+    padding: 40px 32px 30px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    position: relative;
+    overflow: hidden;
+  }
+  .login-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--a), var(--accent), var(--b));
   }
   .login-card h1 {
-    margin: 0 0 6px;
+    margin: 0 0 28px;
     font-family: var(--font);
     font-weight: 600;
     font-size: 28px;
     letter-spacing: 0.02em;
-  }
-  .login-card .sub {
-    color: var(--muted);
-    margin-bottom: 28px;
-    font-size: 14px;
+    text-align: center;
   }
   .field { margin-bottom: 18px; }
   .field label {
     display: block;
-    font-size: 12px;
-    letter-spacing: 0.08em;
+    font-size: 11px;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--muted);
     margin-bottom: 8px;
+    font-weight: 600;
   }
   .field input {
     width: 100%;
     border: 1px solid var(--line);
     background: #fff;
-    border-radius: 12px;
-    padding: 12px 14px;
+    border-radius: 14px;
+    padding: 13px 15px;
     outline: none;
-    transition: border-color .15s, box-shadow .15s;
+    transition: border-color .15s, box-shadow .15s, transform .1s;
   }
   .field input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  #session-label {
+    font-weight: 600;
+    font-size: 15px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #fff8ef, #f5eefc);
+    border: 1px solid var(--line);
   }
   .person-pick {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 12px;
   }
   .person-pick button {
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 14px 10px;
+    border: 1.5px solid var(--line);
+    border-radius: 16px;
+    padding: 16px 12px;
     background: #fff;
-    transition: all .15s;
+    transition: all .18s ease;
+    font-weight: 500;
+  }
+  .person-pick button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
   }
   .person-pick button.active-a {
     border-color: var(--a);
-    background: var(--a-soft);
+    background: linear-gradient(180deg, #eef5fa, var(--a-soft));
     color: var(--a);
-    font-weight: 600;
+    font-weight: 700;
+    box-shadow: 0 0 0 3px rgba(61,107,140,0.12);
   }
   .person-pick button.active-b {
     border-color: var(--b);
-    background: var(--b-soft);
+    background: linear-gradient(180deg, #f4eefc, var(--b-soft));
     color: var(--b);
-    font-weight: 600;
+    font-weight: 700;
+    box-shadow: 0 0 0 3px rgba(107,90,140,0.12);
   }
   .primary {
     width: 100%;
     margin-top: 8px;
     border-radius: 14px;
     padding: 13px 16px;
-    background: var(--ink);
+    background: linear-gradient(180deg, #3a3229, var(--ink));
     color: #fff;
     font-weight: 600;
-    transition: transform .1s, opacity .15s;
+    letter-spacing: 0.02em;
+    transition: transform .1s, opacity .15s, box-shadow .15s;
+    box-shadow: 0 8px 20px rgba(42,36,28,0.18);
   }
-  .primary:hover { opacity: 0.92; }
+  .primary:hover { opacity: 0.95; box-shadow: 0 10px 24px rgba(42,36,28,0.22); }
   .primary:active { transform: scale(0.99); }
-  .primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
   .error {
     color: var(--accent);
     font-size: 13px;
     min-height: 1.2em;
-    margin: 8px 0 0;
+    margin: 10px 0 0;
+    text-align: center;
   }
 
   /* ---------- App shell ---------- */
   #app {
     min-height: 100%;
     display: grid;
-    grid-template-columns: 260px 1fr;
+    grid-template-columns: 280px 1fr;
   }
   @media (max-width: 860px) {
     #app { grid-template-columns: 1fr; }
@@ -179,69 +219,93 @@ export function appHtml(cfg: ResolvedConfig): string {
       box-shadow: var(--shadow);
     }
     .backdrop {
-      position: fixed; inset: 0; background: rgba(42,36,28,.35); z-index: 30;
+      position: fixed; inset: 0; background: rgba(42,36,28,.38); z-index: 30;
+      backdrop-filter: blur(2px);
     }
   }
 
   #sidebar {
     display: flex;
     flex-direction: column;
-    border-right: 1px solid var(--line);
-    background: rgba(255,253,249,0.85);
-    backdrop-filter: blur(10px);
+    border-right: 1px solid rgba(228,216,200,0.85);
+    background: rgba(255,253,249,0.78);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     min-height: 100vh;
   }
   .side-head {
-    padding: 20px 18px 12px;
+    padding: 22px 18px 14px;
     border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,248,239,0.7), transparent);
   }
   .side-head h1 {
     margin: 0;
     font-family: var(--font);
     font-size: 20px;
     font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  .side-head h1::before {
+    content: "📓 ";
+    font-size: 0.92em;
   }
   .who {
-    margin-top: 6px;
+    margin-top: 8px;
     font-size: 12px;
     color: var(--muted);
   }
-  .who strong { color: var(--ink); }
+  .who strong {
+    color: var(--ink);
+    background: linear-gradient(180deg, transparent 60%, var(--accent-soft) 60%);
+    padding: 0 2px;
+  }
   .side-actions {
     display: flex;
     gap: 8px;
-    padding: 12px 14px;
+    padding: 14px;
   }
   .side-actions button, .icon-btn {
     border: 1px solid var(--line);
     background: #fff;
-    border-radius: 10px;
-    padding: 8px 10px;
+    border-radius: 12px;
+    padding: 9px 12px;
     font-size: 13px;
+    transition: background .15s, border-color .15s, transform .1s, box-shadow .15s;
   }
-  .side-actions .grow { flex: 1; background: var(--ink); color: #fff; border-color: var(--ink); }
+  .side-actions button:hover, .icon-btn:hover {
+    border-color: #d4c4ad;
+    box-shadow: var(--shadow-sm);
+  }
+  .side-actions .grow {
+    flex: 1;
+    background: linear-gradient(180deg, #3a3229, var(--ink));
+    color: #fff;
+    border-color: var(--ink);
+    font-weight: 600;
+  }
   .page-list {
     list-style: none;
     margin: 0;
-    padding: 8px;
+    padding: 8px 10px 16px;
     overflow: auto;
     flex: 1;
   }
   .page-list li button {
     width: 100%;
     text-align: left;
-    border-radius: 12px;
-    padding: 12px 12px;
+    border-radius: 14px;
+    padding: 12px 13px;
     border: 1px solid transparent;
+    transition: background .15s, border-color .15s, box-shadow .15s;
   }
   .page-list li button:hover { background: rgba(0,0,0,0.03); }
   .page-list li button.active {
     background: #fff;
     border-color: var(--line);
-    box-shadow: 0 2px 8px rgba(42,36,28,0.04);
+    box-shadow: var(--shadow-sm);
   }
   .page-list .t { font-weight: 600; font-size: 14px; }
-  .page-list .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .page-list .d { color: var(--muted); font-size: 12px; margin-top: 3px; }
 
   #main {
     min-width: 0;
@@ -254,9 +318,10 @@ export function appHtml(cfg: ResolvedConfig): string {
     align-items: center;
     gap: 10px;
     padding: 14px 18px;
-    border-bottom: 1px solid var(--line);
-    background: rgba(255,253,249,0.7);
-    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(228,216,200,0.85);
+    background: rgba(255,253,249,0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -275,24 +340,31 @@ export function appHtml(cfg: ResolvedConfig): string {
   .topbar input.title-edit {
     flex: 1;
     border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 8px 10px;
+    border-radius: 12px;
+    padding: 8px 12px;
     background: #fff;
   }
   .ghost {
     border: 1px solid var(--line);
     background: #fff;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 8px 12px;
     font-size: 13px;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+  }
+  .ghost:hover {
+    border-color: #d4c4ad;
+    box-shadow: var(--shadow-sm);
   }
   .danger { color: var(--accent); }
+  .danger:hover { border-color: #e8b4ab; background: #fff7f5; }
 
   .workspace {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: 1fr 320px;
     min-height: 0;
+    gap: 0;
   }
   @media (max-width: 1100px) {
     .workspace { grid-template-columns: 1fr; }
@@ -304,6 +376,7 @@ export function appHtml(cfg: ResolvedConfig): string {
     grid-template-columns: 1fr 1fr;
     gap: 0;
     min-height: 0;
+    padding: 12px;
   }
   @media (max-width: 720px) {
     .diaries { grid-template-columns: 1fr; }
@@ -313,26 +386,41 @@ export function appHtml(cfg: ResolvedConfig): string {
     display: flex;
     flex-direction: column;
     min-height: 520px;
-    border-right: 1px solid var(--line);
+    margin: 0 6px;
     background: var(--bg-elev);
+    border: 1px solid rgba(228,216,200,0.9);
+    border-radius: 20px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
   }
-  .col:last-child { border-right: none; }
+  .col.a {
+    background:
+      linear-gradient(180deg, rgba(217,231,240,0.35), transparent 90px),
+      var(--bg-elev);
+  }
+  .col.b {
+    background:
+      linear-gradient(180deg, rgba(229,223,240,0.4), transparent 90px),
+      var(--bg-elev);
+  }
   .col-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 14px 16px 8px;
+    padding: 16px 16px 8px;
   }
   .badge {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 14px;
+    letter-spacing: 0.01em;
   }
   .dot {
     width: 10px; height: 10px; border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.7);
   }
   .col.a .dot { background: var(--a); }
   .col.b .dot { background: var(--b); }
@@ -353,18 +441,22 @@ export function appHtml(cfg: ResolvedConfig): string {
     width: 100%;
     min-height: 360px;
     border: 1px solid var(--line);
-    border-radius: 14px;
+    border-radius: 16px;
     background: #fff;
-    padding: 16px 18px;
-    line-height: 1.75;
+    padding: 18px 18px;
+    line-height: 1.8;
     font-family: var(--font);
-    font-size: 16px;
+    font-size: 16.5px;
     white-space: pre-wrap;
     word-break: break-word;
     outline: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+    transition: border-color .15s, box-shadow .15s;
   }
   .body-edit {
     resize: vertical;
+    border-color: #d8c7a8;
+    box-shadow: 0 0 0 3px rgba(196,92,74,0.08);
   }
   .body-view mark {
     background: var(--mark);
@@ -446,44 +538,53 @@ export function appHtml(cfg: ResolvedConfig): string {
 
   /* Annotation panel */
   #ann-panel {
-    background: rgba(255,253,249,0.9);
-    border-left: 1px solid var(--line);
+    background: rgba(255,253,249,0.88);
+    border-left: 1px solid rgba(228,216,200,0.85);
     display: flex;
     flex-direction: column;
     min-height: 0;
+    backdrop-filter: blur(8px);
   }
   #ann-panel h3 {
     margin: 0;
-    padding: 16px 16px 10px;
-    font-size: 14px;
-    letter-spacing: 0.04em;
+    padding: 18px 18px 10px;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
   }
   .ann-list {
     list-style: none;
     margin: 0;
-    padding: 0 10px 16px;
+    padding: 0 12px 18px;
     overflow: auto;
     flex: 1;
   }
   .ann-card {
     border: 1px solid var(--line);
     background: #fff;
-    border-radius: 14px;
-    padding: 12px;
+    border-radius: 16px;
+    padding: 13px 14px;
     margin-bottom: 10px;
     cursor: pointer;
-    transition: border-color .15s, box-shadow .15s;
+    transition: border-color .15s, box-shadow .15s, transform .12s;
   }
-  .ann-card:hover, .ann-card.active {
+  .ann-card:hover {
     border-color: #d8c7a8;
-    box-shadow: 0 4px 14px rgba(42,36,28,0.06);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+  }
+  .ann-card.active {
+    border-color: #d8c7a8;
+    box-shadow: 0 0 0 3px rgba(255,201,74,0.25), var(--shadow-sm);
   }
   .ann-card .quote {
     font-family: var(--font);
     font-size: 13px;
     color: var(--muted);
     border-left: 3px solid var(--mark-active);
-    padding-left: 8px;
+    padding-left: 10px;
     margin-bottom: 8px;
     white-space: pre-wrap;
   }
@@ -509,8 +610,8 @@ export function appHtml(cfg: ResolvedConfig): string {
   .empty {
     color: var(--muted);
     font-size: 13px;
-    padding: 8px 16px 20px;
-    line-height: 1.5;
+    padding: 8px 18px 20px;
+    line-height: 1.55;
   }
 
   /* Selection floating toolbar */
@@ -518,18 +619,19 @@ export function appHtml(cfg: ResolvedConfig): string {
     position: fixed;
     z-index: 50;
     transform: translate(-50%, -100%);
-    background: var(--ink);
+    background: linear-gradient(180deg, #3a3229, var(--ink));
     color: #fff;
     border-radius: 999px;
-    padding: 6px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    padding: 5px;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.22);
     display: none;
   }
-  #sel-bar.visible { display: flex; gap: 4px; }
+  #sel-bar.visible { display: flex; gap: 2px; }
   #sel-bar button {
     color: #fff;
     font-size: 13px;
-    padding: 8px 12px;
+    font-weight: 600;
+    padding: 9px 14px;
     border-radius: 999px;
   }
   #sel-bar button:hover { background: rgba(255,255,255,0.12); }
@@ -538,29 +640,44 @@ export function appHtml(cfg: ResolvedConfig): string {
   #composer {
     position: fixed;
     inset: 0;
-    z-index: 60;
+    z-index: 70;
     display: none;
     place-items: center;
-    background: rgba(42,36,28,0.35);
+    background: rgba(42,36,28,0.42);
+    backdrop-filter: blur(4px);
     padding: 20px;
   }
   #composer.open { display: grid; }
   .composer-card {
-    width: min(440px, 100%);
+    width: min(460px, 100%);
     background: var(--bg-elev);
-    border-radius: 18px;
+    border-radius: 22px;
     border: 1px solid var(--line);
     box-shadow: var(--shadow);
-    padding: 18px;
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
   }
-  .composer-card h4 { margin: 0 0 8px; font-size: 15px; }
+  .composer-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--mark), var(--mark-active), var(--accent));
+  }
+  .composer-card h4 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    font-family: var(--font);
+  }
   .composer-card .q {
     font-family: var(--font);
     font-size: 13px;
     color: var(--muted);
     background: #fff;
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-left: 3px solid var(--mark-active);
+    border-radius: 12px;
     padding: 10px 12px;
     margin-bottom: 12px;
     max-height: 90px;
@@ -571,21 +688,22 @@ export function appHtml(cfg: ResolvedConfig): string {
     width: 100%;
     min-height: 110px;
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 12px;
+    border-radius: 14px;
+    padding: 12px 14px;
     resize: vertical;
     outline: none;
     background: #fff;
+    line-height: 1.55;
   }
   .composer-card textarea:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    box-shadow: 0 0 0 4px var(--accent-soft);
   }
   .composer-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 12px;
+    margin-top: 14px;
   }
   .composer-actions .primary { width: auto; margin: 0; padding: 10px 16px; }
 
@@ -594,13 +712,30 @@ export function appHtml(cfg: ResolvedConfig): string {
     display: grid;
     place-items: center;
     color: var(--muted);
-    padding: 40px;
+    padding: 48px 28px;
     text-align: center;
   }
+  .blank > div {
+    max-width: 360px;
+    padding: 28px 24px;
+    border-radius: 24px;
+    background: rgba(255,253,249,0.7);
+    border: 1px dashed #dccfbd;
+    box-shadow: var(--shadow-sm);
+  }
   .blank h3 {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
     color: var(--ink);
     font-family: var(--font);
+    font-size: 22px;
+  }
+  .blank h3::before {
+    content: "📖 ";
+  }
+  .blank p {
+    margin: 0;
+    line-height: 1.65;
+    font-size: 14px;
   }
 </style>
 </head>
@@ -608,12 +743,11 @@ export function appHtml(cfg: ResolvedConfig): string {
   <div id="login">
     <div class="login-card">
       <h1 id="login-heading">${title}</h1>
-      <div class="sub" id="login-sub">先输入共享 PIN，确认空间后再选择你是谁。</div>
 
       <div id="step-pin">
         <div class="field">
-          <label>PIN</label>
-          <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="由管理员分配的 PIN" />
+          <label>暗号</label>
+          <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="对暗号啦" />
         </div>
         <button class="primary" id="pin-next-btn" type="button">下一步</button>
       </div>
@@ -621,7 +755,7 @@ export function appHtml(cfg: ResolvedConfig): string {
       <div id="step-person" class="hidden">
         <div class="field">
           <label>当前空间</label>
-          <div id="session-label" style="font-weight:600;font-size:15px;padding:4px 0;">—</div>
+          <div id="session-label">—</div>
         </div>
         <div class="field">
           <label>我是</label>
@@ -631,7 +765,7 @@ export function appHtml(cfg: ResolvedConfig): string {
           </div>
         </div>
         <button class="primary" id="login-btn" type="button">进入小本本</button>
-        <button class="ghost" id="back-pin-btn" type="button" style="width:100%;margin-top:10px;padding:10px;">← 换一个 PIN</button>
+        <button class="ghost" id="back-pin-btn" type="button" style="width:100%;margin-top:10px;padding:10px;">← 换一个暗号</button>
       </div>
 
       <p class="error" id="login-error"></p>
@@ -830,7 +964,6 @@ export function appHtml(cfg: ResolvedConfig): string {
   function showPinStep() {
     $("step-pin").classList.remove("hidden");
     $("step-person").classList.add("hidden");
-    $("login-sub").textContent = "先输入共享 PIN，确认空间后再选择你是谁。";
     loginErr.textContent = "";
     state.pendingPin = "";
     state.sessionName = "";
@@ -845,7 +978,6 @@ export function appHtml(cfg: ResolvedConfig): string {
     $("session-label").textContent =
       state.sessionName || state.title || "共同日记本";
     $("login-heading").textContent = state.title || PAGE_TITLE;
-    $("login-sub").textContent = "已找到空间，请选择你的身份进入。";
     setPick(state.pick || "A");
     $("step-pin").classList.add("hidden");
     $("step-person").classList.remove("hidden");
@@ -866,7 +998,7 @@ export function appHtml(cfg: ResolvedConfig): string {
     loginErr.textContent = "";
     const pin = pinEl.value.trim();
     if (!pin) {
-      loginErr.textContent = "请输入 PIN";
+      loginErr.textContent = "请输入暗号";
       return;
     }
     const btn = /** @type {HTMLButtonElement} */ ($("pin-next-btn"));
@@ -879,7 +1011,7 @@ export function appHtml(cfg: ResolvedConfig): string {
       state.pendingPin = pin;
       showPersonStep(data);
     } catch (e) {
-      loginErr.textContent = e.message || "PIN 不正确";
+      loginErr.textContent = e.message || "暗号不对哦";
     } finally {
       btn.disabled = false;
     }
@@ -889,7 +1021,7 @@ export function appHtml(cfg: ResolvedConfig): string {
     loginErr.textContent = "";
     const pin = state.pendingPin || pinEl.value.trim();
     if (!pin) {
-      loginErr.textContent = "请先输入 PIN";
+      loginErr.textContent = "请先输入暗号";
       showPinStep();
       return;
     }
