@@ -73,21 +73,16 @@ export function appHtml(cfg: ResolvedConfig): string {
   /* ---------- Login ---------- */
   #login {
     min-height: 100%;
+    min-height: 100dvh;
     display: grid;
     place-items: center;
     padding: 28px 20px;
+    padding:
+      max(28px, env(safe-area-inset-top))
+      max(20px, env(safe-area-inset-right))
+      max(28px, env(safe-area-inset-bottom))
+      max(20px, env(safe-area-inset-left));
     position: relative;
-  }
-  #login::before {
-    content: "📓";
-    position: absolute;
-    top: 8%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 42px;
-    filter: drop-shadow(0 8px 20px rgba(42,36,28,0.12));
-    opacity: 0.9;
-    pointer-events: none;
   }
   .login-card {
     width: min(420px, 100%);
@@ -108,13 +103,27 @@ export function appHtml(cfg: ResolvedConfig): string {
     height: 4px;
     background: linear-gradient(90deg, var(--a), var(--accent), var(--b));
   }
-  .login-card h1 {
+  .login-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     margin: 0 0 28px;
+  }
+  .login-title .login-icon {
+    font-size: 32px;
+    line-height: 1;
+    filter: drop-shadow(0 4px 10px rgba(42,36,28,0.12));
+    flex-shrink: 0;
+  }
+  .login-card h1 {
+    margin: 0;
     font-family: var(--font);
     font-weight: 600;
     font-size: 28px;
     letter-spacing: 0.02em;
     text-align: center;
+    line-height: 1.25;
   }
   .field { margin-bottom: 18px; }
   .field label {
@@ -204,23 +213,109 @@ export function appHtml(cfg: ResolvedConfig): string {
   /* ---------- App shell ---------- */
   #app {
     min-height: 100%;
+    min-height: 100dvh;
     display: grid;
     grid-template-columns: 280px 1fr;
   }
+  #menu-btn { display: none; }
   @media (max-width: 860px) {
     #app { grid-template-columns: 1fr; }
-    #sidebar { display: none; }
+    #menu-btn { display: inline-flex; align-items: center; justify-content: center; }
+    #sidebar {
+      display: none;
+      padding-top: env(safe-area-inset-top);
+    }
     #sidebar.open {
       display: flex;
       position: fixed;
       inset: 0 auto 0 0;
       width: min(300px, 86vw);
+      max-width: 100%;
       z-index: 40;
       box-shadow: var(--shadow);
+      min-height: 100dvh;
     }
     .backdrop {
       position: fixed; inset: 0; background: rgba(42,36,28,.38); z-index: 30;
       backdrop-filter: blur(2px);
+    }
+    .topbar {
+      padding-top: max(12px, env(safe-area-inset-top));
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .topbar h2 {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 16px;
+    }
+    .topbar .ghost,
+    .topbar input[type="date"],
+    .topbar input.title-edit {
+      font-size: 12px;
+      padding: 7px 10px;
+    }
+    .topbar input[type="date"] {
+      max-width: 42vw;
+    }
+    .diaries {
+      padding: 10px;
+      gap: 10px;
+    }
+    .col {
+      margin: 0;
+      min-height: 0;
+    }
+    .body-view, .body-edit {
+      min-height: 240px;
+      font-size: 16px; /* avoid iOS zoom on focus */
+      padding: 14px;
+    }
+    .editor-wrap { padding: 0 10px 14px; }
+    #ann-panel {
+      min-height: 220px;
+      max-height: 42vh;
+    }
+    .blank { padding: 32px 18px; }
+    .blank > div { padding: 22px 18px; }
+    .login-card {
+      padding: 28px 20px 22px;
+      border-radius: 22px;
+    }
+    .login-card h1 { font-size: 22px; }
+    .login-title .login-icon { font-size: 28px; }
+    .login-title { margin-bottom: 22px; gap: 8px; }
+    .person-pick button { padding: 14px 10px; }
+    #sel-bar {
+      /* keep above home indicator */
+      bottom: auto;
+    }
+    #composer {
+      padding:
+        max(16px, env(safe-area-inset-top))
+        max(16px, env(safe-area-inset-right))
+        max(16px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+      align-items: end;
+    }
+    .composer-card {
+      width: 100%;
+      border-radius: 18px 18px 14px 14px;
+      max-height: min(86dvh, 640px);
+      overflow: auto;
+    }
+  }
+  @media (max-width: 480px) {
+    .topbar #rename-btn,
+    .topbar #delete-btn {
+      padding: 7px 8px;
+    }
+    .topbar #date-input {
+      order: 5;
+      flex: 1 1 100%;
+      max-width: none;
     }
   }
 
@@ -742,7 +837,10 @@ export function appHtml(cfg: ResolvedConfig): string {
 <body>
   <div id="login">
     <div class="login-card">
-      <h1 id="login-heading">${title}</h1>
+      <div class="login-title">
+        <span class="login-icon" aria-hidden="true">📓</span>
+        <h1 id="login-heading">${title}</h1>
+      </div>
 
       <div id="step-pin">
         <div class="field">
@@ -797,7 +895,7 @@ export function appHtml(cfg: ResolvedConfig): string {
       <div id="blank" class="blank">
         <div>
           <h3>还没有打开任何一页</h3>
-          <p>左侧新建一页，开始写下今天的故事。<br/>选中对方（或自己）的文字，即可添加批注。</p>
+          <p>点左上角菜单或「＋ 新的一页」，开始写下今天的故事。<br/>选中对方（或自己）的文字，即可添加批注。</p>
         </div>
       </div>
       <div id="workspace" class="workspace hidden">
@@ -1722,6 +1820,19 @@ export function appHtml(cfg: ResolvedConfig): string {
     sidebar.classList.remove("open");
     backdrop.classList.add("hidden");
   }
+  // Close drawer after choosing a page / creating a page on small screens
+  pageList.addEventListener("click", (e) => {
+    if (window.matchMedia("(max-width: 860px)").matches) {
+      const t = /** @type {HTMLElement} */ (e.target);
+      if (t.closest("button")) closeMobileSidebar();
+    }
+  });
+  $("new-page").addEventListener("click", () => {
+    // existing handler runs too; just close drawer after
+    if (window.matchMedia("(max-width: 860px)").matches) {
+      setTimeout(closeMobileSidebar, 0);
+    }
+  }, true);
 
   // Click outside selection clears bar (but not when interacting with bar/composer)
   document.addEventListener("mousedown", (e) => {
