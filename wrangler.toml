@@ -1,0 +1,17 @@
+name = "shared-diary"
+main = "src/worker.ts"
+compatibility_date = "2025-05-01"
+
+# R2 binding — 在 Cloudflare 控制台创建桶 diary-data 后，改成你的桶名
+[[r2_buckets]]
+binding_name = "DIARY_BUCKET"
+bucket_name = "diary-data"
+
+# 默认 PIN。忘记密码就改这里再 deploy。
+# 仅作单 PIN MVP；复杂度由用户自己保证。
+[vars]
+DIARY_PIN = "123456"
+PAGE_TITLE = "我们的小本本"
+
+[observability]
+enabled = true
