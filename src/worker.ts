@@ -64,6 +64,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
   }
 
   /* ---------- User auth ---------- */
+  if (method === "POST" && path === "/api/lookup-pin") {
+    return lookupPin(request, env);
+  }
   if (method === "POST" && path === "/api/login") {
     return login(request, env);
   }
@@ -354,6 +357,23 @@ async function adminUpdatePage(
 }
 
 /* ---------- User auth ---------- */
+
+async function lookupPin(request: Request, env: Env): Promise<Response> {
+  const body = await safeJson(request);
+  const pin = String(body.pin ?? "").trim();
+  if (!pin) return json({ error: "请输入 PIN" }, 400);
+
+  const space = await findSessionByPin(env, pin);
+  if (!space) return json({ error: "PIN 不正确" }, 401);
+
+  const cfg = sessionToConfig(space);
+  return json({
+    ok: true,
+    sessionName: space.name,
+    names: { A: cfg.personA, B: cfg.personB },
+    title: cfg.pageTitle,
+  });
+}
 
 async function login(request: Request, env: Env): Promise<Response> {
   const body = await safeJson(request);

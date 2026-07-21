@@ -24,6 +24,9 @@ export function appHtml(cfg: ResolvedConfig): string {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light" />
+<meta name="theme-color" content="#f6f1ea" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%93%3C/text%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%93%3C/text%3E%3C/svg%3E" />
 <title>${title}</title>
 <style>
   :root {
@@ -370,8 +373,63 @@ export function appHtml(cfg: ResolvedConfig): string {
     cursor: pointer;
     transition: background .15s;
   }
+  .body-view mark:hover { background: var(--mark-active); }
   .body-view mark.active { background: var(--mark-active); outline: 1px solid rgba(0,0,0,0.08); }
   .body-view mark.mine { box-shadow: inset 0 -2px 0 rgba(196,92,74,0.35); }
+  .body-view mark.self-note { box-shadow: inset 0 -2px 0 rgba(61,107,140,0.4); }
+
+  /* Hover tooltip for highlighted annotations */
+  #ann-tip {
+    position: fixed;
+    z-index: 60;
+    max-width: min(320px, calc(100vw - 24px));
+    background: #2a241c;
+    color: #fffdf9;
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 12px 32px rgba(42,36,28,0.28);
+    font-size: 13px;
+    line-height: 1.5;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -100%) translateY(-10px);
+    transition: opacity .12s ease;
+    display: none;
+  }
+  #ann-tip.visible {
+    display: block;
+    opacity: 1;
+  }
+  #ann-tip .tip-meta {
+    font-size: 11px;
+    opacity: 0.72;
+    margin-bottom: 4px;
+  }
+  #ann-tip .tip-quote {
+    font-family: var(--font);
+    font-size: 12px;
+    opacity: 0.8;
+    border-left: 2px solid var(--mark-active);
+    padding-left: 8px;
+    margin-bottom: 6px;
+    white-space: pre-wrap;
+    max-height: 3.6em;
+    overflow: hidden;
+  }
+  #ann-tip .tip-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #ann-tip .tip-arrow {
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    width: 12px;
+    height: 12px;
+    background: #2a241c;
+    transform: translateX(-50%) rotate(45deg);
+    border-radius: 2px;
+  }
   .col.readonly .body-view { background: #fffcf7; }
   .hint {
     margin-top: 8px;
@@ -549,20 +607,33 @@ export function appHtml(cfg: ResolvedConfig): string {
 <body>
   <div id="login">
     <div class="login-card">
-      <h1>${title}</h1>
-      <div class="sub">输入你们的共享 PIN，选择你是谁，进入对应的共同日记本。</div>
-      <div class="field">
-        <label>PIN</label>
-        <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="由管理员分配的 PIN" />
-      </div>
-      <div class="field">
-        <label>我是</label>
-        <div class="person-pick">
-          <button type="button" data-person="A" class="active-a" id="pick-a">${nameA}</button>
-          <button type="button" data-person="B" id="pick-b">${nameB}</button>
+      <h1 id="login-heading">${title}</h1>
+      <div class="sub" id="login-sub">先输入共享 PIN，确认空间后再选择你是谁。</div>
+
+      <div id="step-pin">
+        <div class="field">
+          <label>PIN</label>
+          <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="由管理员分配的 PIN" />
         </div>
+        <button class="primary" id="pin-next-btn" type="button">下一步</button>
       </div>
-      <button class="primary" id="login-btn" type="button">进入小本本</button>
+
+      <div id="step-person" class="hidden">
+        <div class="field">
+          <label>当前空间</label>
+          <div id="session-label" style="font-weight:600;font-size:15px;padding:4px 0;">—</div>
+        </div>
+        <div class="field">
+          <label>我是</label>
+          <div class="person-pick">
+            <button type="button" data-person="A" class="active-a" id="pick-a">${nameA}</button>
+            <button type="button" data-person="B" id="pick-b">${nameB}</button>
+          </div>
+        </div>
+        <button class="primary" id="login-btn" type="button">进入小本本</button>
+        <button class="ghost" id="back-pin-btn" type="button" style="width:100%;margin-top:10px;padding:10px;">← 换一个 PIN</button>
+      </div>
+
       <p class="error" id="login-error"></p>
     </div>
   </div>
@@ -634,7 +705,7 @@ export function appHtml(cfg: ResolvedConfig): string {
         </div>
         <aside id="ann-panel">
           <h3>批注</h3>
-          <div class="empty" id="ann-empty">选中日记中的一段文字，点击「添加批注」。</div>
+          <div class="empty" id="ann-empty">选中任意一侧文字（含自己）添加批注；悬停高亮可预览内容。</div>
           <ul class="ann-list" id="ann-list"></ul>
         </aside>
       </div>
@@ -643,6 +714,13 @@ export function appHtml(cfg: ResolvedConfig): string {
 
   <div id="sel-bar">
     <button type="button" id="sel-annotate">添加批注</button>
+  </div>
+
+  <div id="ann-tip" role="tooltip" aria-hidden="true">
+    <div class="tip-meta" id="ann-tip-meta"></div>
+    <div class="tip-quote" id="ann-tip-quote"></div>
+    <div class="tip-content" id="ann-tip-content"></div>
+    <div class="tip-arrow"></div>
   </div>
 
   <div id="composer">
@@ -680,6 +758,8 @@ export function appHtml(cfg: ResolvedConfig): string {
     activeAnnId: /** @type {string|null} */ (null),
     selection: /** @type {null | { target: PersonId, start: number, end: number, quote: string }} */ (null),
     pick: /** @type {PersonId} */ ("A"),
+    pendingPin: "",
+    sessionName: "",
   };
 
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -691,6 +771,10 @@ export function appHtml(cfg: ResolvedConfig): string {
   const blank = $("blank");
   const workspace = $("workspace");
   const selBar = $("sel-bar");
+  const annTip = $("ann-tip");
+  const annTipMeta = $("ann-tip-meta");
+  const annTipQuote = $("ann-tip-quote");
+  const annTipContent = $("ann-tip-content");
   const composer = $("composer");
   const composerText = /** @type {HTMLTextAreaElement} */ ($("composer-text"));
   const composerQuote = $("composer-quote");
@@ -699,6 +783,7 @@ export function appHtml(cfg: ResolvedConfig): string {
   const pageTitleEl = $("page-title");
   const sidebar = $("sidebar");
   const backdrop = $("backdrop");
+  let annTipHideTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
 
   async function api(path, opts = {}) {
     const res = await fetch(path, {
@@ -733,7 +818,7 @@ export function appHtml(cfg: ResolvedConfig): string {
     return d.getFullYear() + "-" + m + "-" + day;
   }
 
-  /* ---------- Auth ---------- */
+  /* ---------- Auth (PIN → names → pick person) ---------- */
   $("pick-a").addEventListener("click", () => setPick("A"));
   $("pick-b").addEventListener("click", () => setPick("B"));
   function setPick(p) {
@@ -741,13 +826,79 @@ export function appHtml(cfg: ResolvedConfig): string {
     $("pick-a").classList.toggle("active-a", p === "A");
     $("pick-b").classList.toggle("active-b", p === "B");
   }
+
+  function showPinStep() {
+    $("step-pin").classList.remove("hidden");
+    $("step-person").classList.add("hidden");
+    $("login-sub").textContent = "先输入共享 PIN，确认空间后再选择你是谁。";
+    loginErr.textContent = "";
+    state.pendingPin = "";
+    state.sessionName = "";
+  }
+
+  function showPersonStep(info) {
+    state.names = info.names || state.names;
+    state.title = info.title || state.title;
+    state.sessionName = info.sessionName || "";
+    $("pick-a").textContent = state.names.A;
+    $("pick-b").textContent = state.names.B;
+    $("session-label").textContent =
+      state.sessionName || state.title || "共同日记本";
+    $("login-heading").textContent = state.title || PAGE_TITLE;
+    $("login-sub").textContent = "已找到空间，请选择你的身份进入。";
+    setPick(state.pick || "A");
+    $("step-pin").classList.add("hidden");
+    $("step-person").classList.remove("hidden");
+    loginErr.textContent = "";
+  }
+
+  $("pin-next-btn").addEventListener("click", lookupPin);
+  pinEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") lookupPin();
+  });
   $("login-btn").addEventListener("click", doLogin);
-  pinEl.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+  $("back-pin-btn").addEventListener("click", () => {
+    showPinStep();
+    pinEl.focus();
+  });
+
+  async function lookupPin() {
+    loginErr.textContent = "";
+    const pin = pinEl.value.trim();
+    if (!pin) {
+      loginErr.textContent = "请输入 PIN";
+      return;
+    }
+    const btn = /** @type {HTMLButtonElement} */ ($("pin-next-btn"));
+    btn.disabled = true;
+    try {
+      const data = await api("/api/lookup-pin", {
+        method: "POST",
+        body: JSON.stringify({ pin }),
+      });
+      state.pendingPin = pin;
+      showPersonStep(data);
+    } catch (e) {
+      loginErr.textContent = e.message || "PIN 不正确";
+    } finally {
+      btn.disabled = false;
+    }
+  }
 
   async function doLogin() {
     loginErr.textContent = "";
-    const pin = pinEl.value.trim();
-    if (!pin) { loginErr.textContent = "请输入 PIN"; return; }
+    const pin = state.pendingPin || pinEl.value.trim();
+    if (!pin) {
+      loginErr.textContent = "请先输入 PIN";
+      showPinStep();
+      return;
+    }
+    if (!state.pick) {
+      loginErr.textContent = "请选择身份";
+      return;
+    }
+    const btn = /** @type {HTMLButtonElement} */ ($("login-btn"));
+    btn.disabled = true;
     try {
       const data = await api("/api/login", {
         method: "POST",
@@ -756,9 +907,14 @@ export function appHtml(cfg: ResolvedConfig): string {
       state.person = data.person;
       state.names = data.names || state.names;
       state.title = data.title || state.title;
+      state.sessionName = data.sessionName || state.sessionName;
       enterApp();
     } catch (e) {
       loginErr.textContent = e.message || "登录失败";
+      // PIN may have changed; go back to pin step
+      if (e.status === 401) showPinStep();
+    } finally {
+      btn.disabled = false;
     }
   }
 
@@ -774,10 +930,12 @@ export function appHtml(cfg: ResolvedConfig): string {
         state.person = me.person;
         state.names = me.names || state.names;
         state.title = me.title || state.title;
+        state.sessionName = me.sessionName || "";
         enterApp();
         return;
       }
     } catch {}
+    showPinStep();
     loginEl.classList.remove("hidden");
   }
 
@@ -799,8 +957,14 @@ export function appHtml(cfg: ResolvedConfig): string {
     $("edit-b").classList.toggle("hidden", mine !== "B");
     $("col-a").classList.toggle("readonly", mine !== "A");
     $("col-b").classList.toggle("readonly", mine !== "B");
-    $("hint-a").textContent = mine === "A" ? "点「编辑」写日记；选中文字可批注" : "选中文字可添加批注";
-    $("hint-b").textContent = mine === "B" ? "点「编辑」写日记；选中文字可批注" : "选中文字可添加批注";
+    $("hint-a").textContent =
+      mine === "A"
+        ? "点「编辑」写日记；退出编辑后选中文字可批注（含自己）"
+        : "选中文字可添加批注；悬停高亮可预览";
+    $("hint-b").textContent =
+      mine === "B"
+        ? "点「编辑」写日记；退出编辑后选中文字可批注（含自己）"
+        : "选中文字可添加批注；悬停高亮可预览";
   }
 
   /* ---------- Pages ---------- */
@@ -997,7 +1161,13 @@ export function appHtml(cfg: ResolvedConfig): string {
       const end = Math.max(start, Math.min(a.end, text.length));
       if (end <= start) continue;
       if (start < cursor) continue; // skip overlaps for MVP
-      ranges.push({ start, end, id: a.id, mine: a.author === state.person });
+      ranges.push({
+        start,
+        end,
+        id: a.id,
+        mine: a.author === state.person,
+        selfNote: a.author === a.target,
+      });
       cursor = end;
     }
 
@@ -1005,9 +1175,19 @@ export function appHtml(cfg: ResolvedConfig): string {
     let i = 0;
     for (const r of ranges) {
       if (i < r.start) html += escapeHtml(text.slice(i, r.start));
-      const cls = "ann-mark" + (r.id === state.activeAnnId ? " active" : "") + (r.mine ? " mine" : "");
-      html += '<mark class="' + cls + '" data-ann="' + escapeAttr(r.id) + '">' +
-        escapeHtml(text.slice(r.start, r.end)) + "</mark>";
+      const cls =
+        "ann-mark" +
+        (r.id === state.activeAnnId ? " active" : "") +
+        (r.mine ? " mine" : "") +
+        (r.selfNote ? " self-note" : "");
+      html +=
+        '<mark class="' +
+        cls +
+        '" data-ann="' +
+        escapeAttr(r.id) +
+        '" title="">' +
+        escapeHtml(text.slice(r.start, r.end)) +
+        "</mark>";
       i = r.end;
     }
     if (i < text.length) html += escapeHtml(text.slice(i));
@@ -1030,9 +1210,93 @@ export function appHtml(cfg: ResolvedConfig): string {
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         const id = el.getAttribute("data-ann");
+        hideAnnTip();
         focusAnnotation(id);
       });
+      el.addEventListener("mouseenter", () => {
+        const id = el.getAttribute("data-ann");
+        if (id) showAnnTip(el, id);
+      });
+      el.addEventListener("mouseleave", () => scheduleHideAnnTip());
+      el.addEventListener("focus", () => {
+        const id = el.getAttribute("data-ann");
+        if (id) showAnnTip(el, id);
+      });
+      el.addEventListener("blur", () => scheduleHideAnnTip());
+      // keyboard / a11y
+      el.setAttribute("tabindex", "0");
+      el.setAttribute("role", "button");
     });
+  }
+
+  function findAnnotation(id) {
+    return (state.page?.annotations || []).find((a) => a.id === id) || null;
+  }
+
+  function showAnnTip(anchor, annId) {
+    if (annTipHideTimer) {
+      clearTimeout(annTipHideTimer);
+      annTipHideTimer = null;
+    }
+    const ann = findAnnotation(annId);
+    if (!ann) {
+      hideAnnTip();
+      return;
+    }
+    const selfNote = ann.author === ann.target;
+    annTipMeta.textContent =
+      nameOf(ann.author) +
+      (selfNote ? " · 自注" : " · 批 " + nameOf(ann.target)) +
+      " · " +
+      fmtTime(ann.createdAt);
+    if (ann.quote) {
+      annTipQuote.textContent = "「" + ann.quote + "」";
+      annTipQuote.classList.remove("hidden");
+    } else {
+      annTipQuote.textContent = "";
+      annTipQuote.classList.add("hidden");
+    }
+    annTipContent.textContent = ann.content || "";
+    annTip.classList.add("visible");
+    annTip.setAttribute("aria-hidden", "false");
+
+    const rect = anchor.getBoundingClientRect();
+    const tipW = Math.min(320, window.innerWidth - 24);
+    let left = rect.left + rect.width / 2;
+    left = Math.max(12 + tipW / 2, Math.min(left, window.innerWidth - 12 - tipW / 2));
+    let top = rect.top - 10;
+    // if too close to top, flip below
+    const flip = top < 80;
+    if (flip) {
+      annTip.style.transform = "translate(-50%, 0) translateY(10px)";
+      top = rect.bottom + 10;
+      annTip.querySelector(".tip-arrow")?.setAttribute(
+        "style",
+        "top:-6px;bottom:auto;left:50%;transform:translateX(-50%) rotate(45deg);",
+      );
+    } else {
+      annTip.style.transform = "translate(-50%, -100%) translateY(-10px)";
+      annTip.querySelector(".tip-arrow")?.setAttribute(
+        "style",
+        "bottom:-6px;top:auto;left:50%;transform:translateX(-50%) rotate(45deg);",
+      );
+    }
+    annTip.style.left = left + "px";
+    annTip.style.top = top + "px";
+  }
+
+  function scheduleHideAnnTip() {
+    if (annTipHideTimer) clearTimeout(annTipHideTimer);
+    annTipHideTimer = setTimeout(() => hideAnnTip(), 80);
+  }
+
+  function hideAnnTip() {
+    if (annTipHideTimer) {
+      clearTimeout(annTipHideTimer);
+      annTipHideTimer = null;
+    }
+    annTip.classList.remove("visible");
+    annTip.setAttribute("aria-hidden", "true");
   }
 
   $("edit-a").addEventListener("click", () => startEdit("A"));
@@ -1081,8 +1345,14 @@ export function appHtml(cfg: ResolvedConfig): string {
   /* ---------- Selection → annotation ---------- */
   document.addEventListener("mouseup", onSelectionChange);
   document.addEventListener("keyup", onSelectionChange);
-  document.addEventListener("scroll", hideSelBar, true);
-  window.addEventListener("resize", hideSelBar);
+  document.addEventListener("scroll", () => {
+    hideSelBar();
+    hideAnnTip();
+  }, true);
+  window.addEventListener("resize", () => {
+    hideSelBar();
+    hideAnnTip();
+  });
 
   function onSelectionChange() {
     if (state.editing) { hideSelBar(); return; }
@@ -1094,11 +1364,13 @@ export function appHtml(cfg: ResolvedConfig): string {
     const range = sel.getRangeAt(0);
     const view = findViewRoot(range.commonAncestorContainer);
     if (!view) { hideSelBar(); return; }
+    // A/B 两侧均可批注，包括给自己（target 可等于当前身份）
     const target = /** @type {PersonId} */ (view.getAttribute("data-target"));
     const offsets = rangeToOffsets(view, range);
     if (!offsets || offsets.end <= offsets.start) { hideSelBar(); return; }
     const quote = (view.textContent || "").slice(offsets.start, offsets.end);
     if (!quote.trim()) { hideSelBar(); return; }
+    hideAnnTip();
     state.selection = { target, start: offsets.start, end: offsets.end, quote };
     placeSelBar(range);
   }
@@ -1150,10 +1422,12 @@ export function appHtml(cfg: ResolvedConfig): string {
   function openComposer(mode, ann) {
     composerMode = mode;
     hideSelBar();
+    hideAnnTip();
     if (mode === "create") {
       if (!state.selection) return;
       editingAnnId = null;
-      $("composer-title").textContent = "添加批注";
+      const selfNote = state.selection.target === state.person;
+      $("composer-title").textContent = selfNote ? "添加批注（给自己）" : "添加批注";
       composerQuote.textContent = "「" + state.selection.quote + "」";
       composerText.value = "";
     } else {
@@ -1245,7 +1519,10 @@ export function appHtml(cfg: ResolvedConfig): string {
       foot.className = "foot";
       const left = document.createElement("span");
       left.textContent =
-        nameOf(a.author) + " · 批 " + nameOf(a.target) + " · " + fmtTime(a.createdAt);
+        nameOf(a.author) +
+        (a.author === a.target ? " · 自注" : " · 批 " + nameOf(a.target)) +
+        " · " +
+        fmtTime(a.createdAt);
       foot.appendChild(left);
 
       if (a.author === state.person) {
