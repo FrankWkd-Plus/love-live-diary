@@ -25,8 +25,9 @@
 - 笔记本 📓 favicon；暖色纸质感界面
 
 ### 管理端 `/admin`
-- **会话管理**：创建 / 编辑 / 删除会话；每会话独立 PIN（全局唯一）
-- 为会话配置双方姓名、页面标题
+- **会话管理**：创建 / 编辑 / **删除会话**（连带清空该会话全部日记）
+- 会话列表每项右侧有 **删除** 按钮；单击会话进入编辑态也可删除
+- 每会话独立 PIN（全局唯一）、双方姓名、页面标题
 - 按会话查看、编辑、删除日记页与正文
 - 深色管理控制台
 
@@ -151,7 +152,7 @@ Cookie 含 `sessionId`；页操作仅限当前会话。
 | POST | `/api/admin/login` · `/logout` | 登录 / 退出 |
 | GET | `/api/admin/me` | 管理员状态 |
 | GET/POST | `/api/admin/sessions` | 列表 / 创建 |
-| GET/PUT/DELETE | `/api/admin/sessions/:id` | 详情 / 更新 / 删除（连带日记） |
+| GET/PUT/DELETE | `/api/admin/sessions/:id` | 详情 / 更新 / **删除会话**（连带全部日记与批注） |
 | GET | `/api/admin/sessions/:id/pages` | 该会话页列表 |
 | GET/PUT/DELETE | `/api/admin/sessions/:id/pages/:pageId` | 页读写删 |
 

@@ -187,23 +187,45 @@ export function adminHtml(cfg: ResolvedConfig): string {
   .actions .primary { width: auto; padding: 9px 14px; }
 
   .session-list, .page-list { list-style: none; margin: 0; padding: 0; }
-  .session-list li button, .page-list li button {
+  .session-list li, .page-list li { margin-bottom: 6px; }
+  .session-list li .session-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .session-list li .session-main,
+  .page-list li button {
     width: 100%;
     text-align: left;
     padding: 11px 12px;
     border-radius: 12px;
     border: 1px solid transparent;
-    margin-bottom: 6px;
     transition: background .15s, border-color .15s, transform .1s;
   }
-  .session-list li button:hover, .page-list li button:hover {
+  .page-list li button { margin-bottom: 0; }
+  .session-list li .session-main:hover, .page-list li button:hover {
     background: #121722;
     border-color: rgba(42,51,68,0.8);
   }
-  .session-list li button.active, .page-list li button.active {
+  .session-list li .session-main.active, .page-list li button.active {
     border-color: rgba(110,168,254,0.35);
     background: linear-gradient(180deg, #172033, #121722);
     box-shadow: 0 0 0 1px rgba(110,168,254,0.08);
+  }
+  .session-list li .session-del {
+    border: 1px solid #5a2a2a;
+    color: var(--danger);
+    border-radius: 12px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background .15s, border-color .15s;
+  }
+  .session-list li .session-del:hover {
+    background: rgba(255,123,114,0.1);
+    border-color: #7a3530;
   }
   .t { font-weight: 600; font-size: 14px; }
   .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
@@ -251,7 +273,7 @@ export function adminHtml(cfg: ResolvedConfig): string {
   <div id="login">
     <div class="card">
       <h1>管理后台</h1>
-      <div class="sub">管理多组会话：各自 PIN、姓名与日记页完全隔离。</div>
+      <div class="sub">管理多组会话：各自 PIN、姓名与日记页完全隔离。列表右侧可直接删除会话。</div>
       <div class="field">
         <label>管理员密码</label>
         <input id="admin-pass" type="password" autocomplete="current-password" placeholder="Admin password" />
@@ -501,9 +523,13 @@ export function adminHtml(cfg: ResolvedConfig): string {
     }
     for (const s of state.sessions) {
       const li = document.createElement("li");
+      const row = document.createElement("div");
+      row.className = "session-row";
+
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = s.id === state.currentSessionId ? "active" : "";
+      btn.className =
+        "session-main" + (s.id === state.currentSessionId ? " active" : "");
       const show = !!state.showPins[s.id];
       const pinText = show ? (s.pin || "") : "••••";
       btn.innerHTML =
@@ -520,12 +546,25 @@ export function adminHtml(cfg: ResolvedConfig): string {
         state.showPins[s.id] = !state.showPins[s.id];
         renderSessionList();
       });
-      btn.addEventListener("click", () => selectSession(s.id));
-      btn.addEventListener("dblclick", () => {
-        selectSession(s.id);
+      // 单击：选中会话并进入编辑态（可改信息 / 删除）
+      btn.addEventListener("click", async () => {
+        await selectSession(s.id);
         fillSessionForm(s);
       });
-      li.appendChild(btn);
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "session-del";
+      del.title = "删除此会话及全部日记";
+      del.textContent = "删除";
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        removeSession(s.id, s.name || s.id);
+      });
+
+      row.appendChild(btn);
+      row.appendChild(del);
+      li.appendChild(row);
       ul.appendChild(li);
     }
   }
@@ -585,28 +624,44 @@ export function adminHtml(cfg: ResolvedConfig): string {
     }
   });
 
-  $("delete-session").addEventListener("click", async () => {
-    if (!state.editingSessionId) return;
-    const s = state.sessions.find((x) => x.id === state.editingSessionId);
-    const label = (s && s.name) || state.editingSessionId;
-    if (!confirm("确定删除会话「" + label + "」？将清除该会话全部日记，不可恢复。")) return;
+  async function removeSession(sessionId, label) {
+    if (!sessionId) return;
+    const name = label || sessionId;
+    if (
+      !confirm(
+        "确定删除会话「" +
+          name +
+          "」？\n将永久清除该会话的全部日记页与批注，且无法恢复。",
+      )
+    ) {
+      return;
+    }
     try {
-      await api(
-        "/api/admin/sessions/" + encodeURIComponent(state.editingSessionId),
-        { method: "DELETE" },
-      );
-      if (state.currentSessionId === state.editingSessionId) {
+      await api("/api/admin/sessions/" + encodeURIComponent(sessionId), {
+        method: "DELETE",
+      });
+      if (state.currentSessionId === sessionId) {
         state.currentSessionId = null;
         clearPageEditor();
         state.pages = [];
         renderPageList();
         $("session-badge").textContent = "未选择";
       }
-      resetSessionForm();
+      if (state.editingSessionId === sessionId) {
+        resetSessionForm();
+      }
+      delete state.showPins[sessionId];
       await refreshSessions();
     } catch (e) {
       alert(e.message || "删除失败");
     }
+  }
+
+  $("delete-session").addEventListener("click", async () => {
+    if (!state.editingSessionId) return;
+    const s = state.sessions.find((x) => x.id === state.editingSessionId);
+    const label = (s && s.name) || state.editingSessionId;
+    await removeSession(state.editingSessionId, label);
   });
 
   async function refreshPages() {
