@@ -1,16 +1,27 @@
-import type { Annotation, Env, PersonId, SessionPayload } from "./types";
+import type {
+  AdminSessionPayload,
+  Annotation,
+  Env,
+  PersonId,
+  SessionPayload,
+} from "./types";
 import { randomId, signSession, verifySession } from "./crypto";
 import {
   createPage,
   deletePage,
   getPage,
   listPages,
+  resolveConfig,
   savePage,
+  saveSettings,
 } from "./store";
+import { adminHtml } from "./admin";
 import { appHtml } from "./ui";
 
 const COOKIE = "diary_session";
+const ADMIN_COOKIE = "diary_admin";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+const ADMIN_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -28,17 +39,23 @@ async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
+  const cfg = await resolveConfig(env);
 
   if (method === "GET" && (path === "/" || path === "/index.html")) {
-    return html(appHtml(env));
+    return html(appHtml(cfg));
+  }
+
+  if (method === "GET" && (path === "/admin" || path === "/admin/")) {
+    return html(adminHtml(cfg));
   }
 
   if (method === "GET" && path === "/api/health") {
     return json({ ok: true });
   }
 
+  /* ---------- User auth ---------- */
   if (method === "POST" && path === "/api/login") {
-    return login(request, env);
+    return login(request, env, cfg);
   }
   if (method === "POST" && path === "/api/logout") {
     return logout(request);
@@ -49,9 +66,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({
       authenticated: true,
       person: session.person,
-      names: { A: env.PERSON_A, B: env.PERSON_B },
-      title: env.PAGE_TITLE,
+      names: { A: cfg.personA, B: cfg.personB },
+      title: cfg.pageTitle,
     });
+  }
+
+  /* ---------- Admin auth & APIs (before user session gate) ---------- */
+  if (path.startsWith("/api/admin")) {
+    return handleAdmin(request, env, cfg, path, method);
   }
 
   const session = await readSession(request, env);
@@ -115,16 +137,215 @@ async function handle(request: Request, env: Env): Promise<Response> {
   return json({ error: "Not found" }, 404);
 }
 
-/* ---------- Auth ---------- */
+/* ---------- Admin ---------- */
 
-async function login(request: Request, env: Env): Promise<Response> {
+async function handleAdmin(
+  request: Request,
+  env: Env,
+  cfg: Awaited<ReturnType<typeof resolveConfig>>,
+  path: string,
+  method: string,
+): Promise<Response> {
+  if (method === "POST" && path === "/api/admin/login") {
+    return adminLogin(request, env);
+  }
+  if (method === "POST" && path === "/api/admin/logout") {
+    return adminLogout(request);
+  }
+  if (method === "GET" && path === "/api/admin/me") {
+    const admin = await readAdminSession(request, env);
+    if (!admin) return json({ authenticated: false });
+    return json({
+      authenticated: true,
+      role: "admin",
+      settings: {
+        pin: cfg.pin,
+        personA: cfg.personA,
+        personB: cfg.personB,
+        pageTitle: cfg.pageTitle,
+      },
+    });
+  }
+
+  const admin = await readAdminSession(request, env);
+  if (!admin) return json({ error: "管理员未登录" }, 401);
+
+  if (method === "GET" && path === "/api/admin/settings") {
+    return json({
+      pin: cfg.pin,
+      personA: cfg.personA,
+      personB: cfg.personB,
+      pageTitle: cfg.pageTitle,
+    });
+  }
+
+  if (method === "PUT" && path === "/api/admin/settings") {
+    const body = await safeJson(request);
+    const patch: {
+      pin?: string;
+      personA?: string;
+      personB?: string;
+      pageTitle?: string;
+    } = {};
+    if (typeof body.pin === "string" && body.pin.trim()) {
+      if (body.pin.trim().length < 4) {
+        return json({ error: "PIN 至少 4 位" }, 400);
+      }
+      patch.pin = body.pin.trim();
+    }
+    if (typeof body.personA === "string" && body.personA.trim()) {
+      patch.personA = body.personA.trim();
+    }
+    if (typeof body.personB === "string" && body.personB.trim()) {
+      patch.personB = body.personB.trim();
+    }
+    if (typeof body.pageTitle === "string" && body.pageTitle.trim()) {
+      patch.pageTitle = body.pageTitle.trim();
+    }
+    if (!Object.keys(patch).length) {
+      return json({ error: "没有可更新的字段" }, 400);
+    }
+    await saveSettings(env, patch);
+    const next = await resolveConfig(env);
+    return json({
+      ok: true,
+      settings: {
+        pin: next.pin,
+        personA: next.personA,
+        personB: next.personB,
+        pageTitle: next.pageTitle,
+      },
+    });
+  }
+
+  if (method === "GET" && path === "/api/admin/pages") {
+    const pages = await listPages(env);
+    return json({ pages });
+  }
+
+  const pageMatch = path.match(/^\/api\/admin\/pages\/([^/]+)(.*)$/);
+  if (pageMatch) {
+    const pageId = decodeURIComponent(pageMatch[1]!);
+    const rest = pageMatch[2] || "";
+
+    if (method === "GET" && rest === "") {
+      const page = await getPage(env, pageId);
+      if (!page) return json({ error: "页面不存在" }, 404);
+      return json({ page });
+    }
+
+    if (method === "DELETE" && rest === "") {
+      const ok = await deletePage(env, pageId);
+      if (!ok) return json({ error: "页面不存在" }, 404);
+      return json({ ok: true });
+    }
+
+    if (method === "PUT" && rest === "") {
+      return adminUpdatePage(request, env, pageId);
+    }
+  }
+
+  return json({ error: "Not found" }, 404);
+}
+
+async function adminLogin(request: Request, env: Env): Promise<Response> {
+  const body = await safeJson(request);
+  const password = String(body.password ?? "");
+  const expected = env.ADMIN_PASSWORD || "Frank1202";
+  if (!password || password !== expected) {
+    return json({ error: "管理员密码不正确" }, 401);
+  }
+  const exp = Date.now() + ADMIN_TTL_MS;
+  const token = await signSession(
+    { ok: true, role: "admin", exp } satisfies AdminSessionPayload,
+    env.SESSION_SECRET,
+  );
+  const headers = new Headers({ "Content-Type": "application/json" });
+  headers.append(
+    "Set-Cookie",
+    cookieHeader(ADMIN_COOKIE, token, request, Math.floor(ADMIN_TTL_MS / 1000)),
+  );
+  return new Response(JSON.stringify({ ok: true, role: "admin" }), {
+    status: 200,
+    headers,
+  });
+}
+
+function adminLogout(request: Request): Response {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  headers.append("Set-Cookie", cookieHeader(ADMIN_COOKIE, "", request, 0));
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+}
+
+async function readAdminSession(
+  request: Request,
+  env: Env,
+): Promise<AdminSessionPayload | null> {
+  const cookie = request.headers.get("Cookie") || "";
+  const match = cookie.match(new RegExp(`(?:^|;\\s*)${ADMIN_COOKIE}=([^;]+)`));
+  if (!match) return null;
+  const payload = await verifySession<AdminSessionPayload>(
+    match[1]!,
+    env.SESSION_SECRET,
+  );
+  if (!payload || !payload.ok || payload.role !== "admin") return null;
+  if (typeof payload.exp !== "number" || payload.exp < Date.now()) return null;
+  return payload;
+}
+
+async function adminUpdatePage(
+  request: Request,
+  env: Env,
+  pageId: string,
+): Promise<Response> {
+  const page = await getPage(env, pageId);
+  if (!page) return json({ error: "页面不存在" }, 404);
+  const body = await safeJson(request);
+
+  if (typeof body.title === "string" && body.title.trim()) {
+    page.title = body.title.trim();
+  }
+  if (typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+    page.date = body.date;
+  }
+  if (body.entries && typeof body.entries === "object") {
+    const entries = body.entries as Record<string, unknown>;
+    for (const p of ["A", "B"] as const) {
+      const e = entries[p];
+      if (e && typeof e === "object") {
+        const ent = e as Record<string, unknown>;
+        if (typeof ent.body === "string") {
+          page.entries[p] = {
+            body: ent.body,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+      }
+    }
+  }
+  // Admin may also replace annotations wholesale if provided
+  if (Array.isArray(body.annotations)) {
+    page.annotations = body.annotations as Annotation[];
+  }
+
+  const saved = await savePage(env, page);
+  return json({ page: saved });
+}
+
+/* ---------- User auth ---------- */
+
+async function login(
+  request: Request,
+  env: Env,
+  cfg: Awaited<ReturnType<typeof resolveConfig>>,
+): Promise<Response> {
   const body = await safeJson(request);
   const pin = String(body.pin ?? "");
   const person: PersonId | null =
     body.person === "B" ? "B" : body.person === "A" ? "A" : null;
 
   if (!person) return json({ error: "请选择身份（A 或 B）" }, 400);
-  if (pin !== env.DIARY_PIN) return json({ error: "PIN 不正确" }, 401);
+  if (pin !== cfg.pin) return json({ error: "PIN 不正确" }, 401);
 
   const exp = Date.now() + SESSION_TTL_MS;
   const token = await signSession(
@@ -135,14 +356,14 @@ async function login(request: Request, env: Env): Promise<Response> {
   const headers = new Headers({ "Content-Type": "application/json" });
   headers.append(
     "Set-Cookie",
-    cookieHeader(token, request, Math.floor(SESSION_TTL_MS / 1000)),
+    cookieHeader(COOKIE, token, request, Math.floor(SESSION_TTL_MS / 1000)),
   );
   return new Response(
     JSON.stringify({
       ok: true,
       person,
-      names: { A: env.PERSON_A, B: env.PERSON_B },
-      title: env.PAGE_TITLE,
+      names: { A: cfg.personA, B: cfg.personB },
+      title: cfg.pageTitle,
     }),
     { status: 200, headers },
   );
@@ -150,16 +371,21 @@ async function login(request: Request, env: Env): Promise<Response> {
 
 function logout(request: Request): Response {
   const headers = new Headers({ "Content-Type": "application/json" });
-  headers.append("Set-Cookie", cookieHeader("", request, 0));
+  headers.append("Set-Cookie", cookieHeader(COOKIE, "", request, 0));
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
 
-function cookieHeader(token: string, request: Request, maxAge: number): string {
+function cookieHeader(
+  name: string,
+  token: string,
+  request: Request,
+  maxAge: number,
+): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   if (!token) {
-    return `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+    return `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
   }
-  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+  return `${name}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
 }
 
 async function readSession(
@@ -255,7 +481,6 @@ async function addAnnotation(
   }
   if (!content) return json({ error: "批注内容不能为空" }, 400);
 
-  // Soft-clamp to body length if body exists
   const text = page.entries[target]?.body ?? "";
   const clampedStart = Math.min(start, text.length);
   const clampedEnd = Math.min(end, text.length);

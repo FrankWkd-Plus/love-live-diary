@@ -1,4 +1,4 @@
-import type { Env } from "./types";
+import type { ResolvedConfig } from "./types";
 
 /** Escape for embedding into an HTML text node / attribute-safe context. */
 function esc(s: string): string {
@@ -13,10 +13,10 @@ function esc(s: string): string {
  * Single-page app shell: PIN login → dual diary notebook with Feishu-like
  * text annotations. All client logic is inline (no build step).
  */
-export function appHtml(env: Env): string {
-  const title = esc(env.PAGE_TITLE || "我们的小本本");
-  const nameA = esc(env.PERSON_A || "小A");
-  const nameB = esc(env.PERSON_B || "小B");
+export function appHtml(cfg: ResolvedConfig): string {
+  const title = esc(cfg.pageTitle || "我们的小本本");
+  const nameA = esc(cfg.personA || "小A");
+  const nameB = esc(cfg.personB || "小B");
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -659,9 +659,9 @@ export function appHtml(env: Env): string {
 
 <script>
 (() => {
-  const NAME_A = ${JSON.stringify(env.PERSON_A || "小A")};
-  const NAME_B = ${JSON.stringify(env.PERSON_B || "小B")};
-  const PAGE_TITLE = ${JSON.stringify(env.PAGE_TITLE || "我们的小本本")};
+  const NAME_A = ${JSON.stringify(cfg.personA || "小A")};
+  const NAME_B = ${JSON.stringify(cfg.personB || "小B")};
+  const PAGE_TITLE = ${JSON.stringify(cfg.pageTitle || "我们的小本本")};
 
   /** @typedef {"A"|"B"} PersonId */
   /** @typedef {{ id:string, author:PersonId, target:PersonId, start:number, end:number, quote:string, content:string, createdAt:string, updatedAt:string }} Annotation */

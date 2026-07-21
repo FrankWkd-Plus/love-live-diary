@@ -1,7 +1,8 @@
-import type { DiaryMeta, Env, Page } from "./types";
+import type { AppSettings, DiaryMeta, Env, Page, ResolvedConfig } from "./types";
 import { randomId } from "./crypto";
 
 const META_KEY = "meta.json";
+const SETTINGS_KEY = "settings.json";
 const pageKey = (id: string) => `pages/${id}.json`;
 
 function emptyMeta(): DiaryMeta {
@@ -23,6 +24,57 @@ async function putMeta(env: Env, meta: DiaryMeta): Promise<void> {
   await env.DIARY_BUCKET.put(META_KEY, JSON.stringify(meta, null, 2), {
     httpMetadata: { contentType: "application/json" },
   });
+}
+
+export async function getSettings(env: Env): Promise<AppSettings> {
+  const obj = await env.DIARY_BUCKET.get(SETTINGS_KEY);
+  if (!obj) return {};
+  try {
+    return (await obj.json()) as AppSettings;
+  } catch {
+    return {};
+  }
+}
+
+export async function saveSettings(
+  env: Env,
+  patch: Partial<AppSettings>,
+): Promise<AppSettings> {
+  const current = await getSettings(env);
+  const next: AppSettings = { ...current };
+
+  if (typeof patch.pin === "string") {
+    const pin = patch.pin.trim();
+    if (pin) next.pin = pin;
+  }
+  if (typeof patch.personA === "string") {
+    const v = patch.personA.trim();
+    if (v) next.personA = v;
+  }
+  if (typeof patch.personB === "string") {
+    const v = patch.personB.trim();
+    if (v) next.personB = v;
+  }
+  if (typeof patch.pageTitle === "string") {
+    const v = patch.pageTitle.trim();
+    if (v) next.pageTitle = v;
+  }
+  next.updatedAt = new Date().toISOString();
+
+  await env.DIARY_BUCKET.put(SETTINGS_KEY, JSON.stringify(next, null, 2), {
+    httpMetadata: { contentType: "application/json" },
+  });
+  return next;
+}
+
+export async function resolveConfig(env: Env): Promise<ResolvedConfig> {
+  const s = await getSettings(env);
+  return {
+    pin: (s.pin && s.pin.trim()) || env.DIARY_PIN || "123456",
+    personA: (s.personA && s.personA.trim()) || env.PERSON_A || "小A",
+    personB: (s.personB && s.personB.trim()) || env.PERSON_B || "小B",
+    pageTitle: (s.pageTitle && s.pageTitle.trim()) || env.PAGE_TITLE || "我们的小本本",
+  };
 }
 
 export async function listPages(env: Env): Promise<DiaryMeta["pages"]> {

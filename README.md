@@ -4,6 +4,9 @@
 
 输入共享 PIN、选择身份后进入共同日记本：每一页左右各一人的日记，支持类似飞书文档的**划词批注**。
 
+**线上地址：** https://love-live-diary.frankwkd.workers.dev  
+**仓库：** https://github.com/FrankWkd-Plus/love-live-diary
+
 ## 功能（MVP）
 
 - 共享 PIN 登录，选择身份 A / B
@@ -18,6 +21,7 @@
 - Cloudflare Workers（API + 内嵌静态 SPA，无前端构建）
 - Cloudflare R2（`meta.json` + `pages/<id>.json`）
 - 会话：HMAC 签名 Cookie（30 天）
+- GitHub Actions 自动部署（push `main`）
 
 ## 快速开始
 
@@ -30,48 +34,57 @@ npm install
 ### 2. 本地开发
 
 ```bash
+cp .dev.vars.example .dev.vars   # 本地 PIN / 密钥
 npm run dev
 ```
 
 打开终端提示的本地地址（通常是 `http://127.0.0.1:8787`）。
 
-本地会使用 Wrangler 模拟的 R2，无需真实 Cloudflare 账号即可体验。
-
-默认 PIN：`123456`（见 `wrangler.toml`）。
+本地会使用 Wrangler 模拟的 R2。默认 PIN 见 `.dev.vars.example`（`123456`）。
 
 ### 3. 部署到 Cloudflare
 
-1. 在 Cloudflare 控制台创建 R2 桶，默认名 `diary-data`（可在 `wrangler.toml` 修改）
-2. 修改 `wrangler.toml` 中的配置：
+```bash
+npx wrangler login
+npx wrangler r2 bucket create diary-data   # 仅首次
+npm run deploy
+
+# 敏感配置用 secret（不要写进 git）
+npx wrangler secret put DIARY_PIN
+npx wrangler secret put SESSION_SECRET
+```
+
+展示名等非敏感配置在 `wrangler.toml` 的 `[vars]`：
 
 ```toml
 [vars]
-DIARY_PIN = "你的共享PIN"
 PAGE_TITLE = "我们的小本本"
 PERSON_A = "小A"
 PERSON_B = "小B"
-SESSION_SECRET = "换成足够长的随机字符串"
 ```
 
-3. 登录并部署：
+### 4. GitHub 自动部署
 
-```bash
-npx wrangler login
-npm run deploy
-```
+仓库已包含 `.github/workflows/deploy.yml`。在 GitHub 仓库 **Settings → Secrets and variables → Actions** 添加：
+
+| Secret | 说明 |
+|--------|------|
+| `CLOUDFLARE_API_TOKEN` | 权限含 Workers Scripts Edit、Account Read、R2 等 |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID（本账号：`27e1ca33bfb4852baa84fa237d79b6fb`） |
+
+Worker 上的 `DIARY_PIN` / `SESSION_SECRET` 仍用 `wrangler secret put` 管理，不经过 GitHub。
 
 ## 配置项
 
-| 变量 | 说明 |
-|------|------|
-| `DIARY_PIN` | 进入双人空间的共享 PIN |
-| `PAGE_TITLE` | 页面标题 |
-| `PERSON_A` / `PERSON_B` | 两位作者显示名 |
-| `SESSION_SECRET` | 会话 Cookie 签名密钥，**部署前务必修改** |
-| `DIARY_BUCKET` | R2 binding，对应桶名 `diary-data` |
+| 变量 | 来源 | 说明 |
+|------|------|------|
+| `DIARY_PIN` | **secret** | 进入双人空间的共享 PIN |
+| `SESSION_SECRET` | **secret** | 会话 Cookie 签名密钥 |
+| `PAGE_TITLE` | vars | 页面标题 |
+| `PERSON_A` / `PERSON_B` | vars | 两位作者显示名 |
+| `DIARY_BUCKET` | R2 binding | 桶名 `diary-data` |
 
-也可用 `.dev.vars` 覆盖本地开发变量（勿提交密钥）。
-
+本地用 `.dev.vars` 覆盖（勿提交）。
 ## API 概览
 
 | 方法 | 路径 | 说明 |

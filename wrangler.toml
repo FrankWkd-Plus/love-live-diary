@@ -2,21 +2,22 @@ name = "love-live-diary"
 main = "src/worker.ts"
 compatibility_date = "2025-05-01"
 
-# R2 binding — 在 Cloudflare 控制台创建桶 diary-data 后确认桶名一致
+# R2 binding
 [[r2_buckets]]
 binding = "DIARY_BUCKET"
 bucket_name = "diary-data"
 
-# 默认配置。改完后 re-deploy 生效。
-# DIARY_PIN: 进入双人空间的共享 PIN
-# PERSON_A / PERSON_B: 两位作者显示名
-# SESSION_SECRET: 会话签名密钥，部署前请改成随机字符串
+# 非敏感展示配置。敏感项用 secret：
+#   npx wrangler secret put DIARY_PIN
+#   npx wrangler secret put SESSION_SECRET
+#   npx wrangler secret put ADMIN_PASSWORD
 [vars]
-DIARY_PIN = "123456"
 PAGE_TITLE = "我们的小本本"
 PERSON_A = "小A"
 PERSON_B = "小B"
-SESSION_SECRET = "change-me-to-a-long-random-string"
+
+# 本地开发默认值见 .dev.vars.example（复制为 .dev.vars）
+# 生产环境 DIARY_PIN / SESSION_SECRET / ADMIN_PASSWORD 通过 wrangler secret 注入
 
 [observability]
 enabled = true
