@@ -44,17 +44,26 @@ export interface DiaryMeta {
   updatedAt: string;
 }
 
-/** Runtime overrides stored in R2 (admin-editable). */
-export interface AppSettings {
-  pin?: string;
-  personA?: string;
-  personB?: string;
-  pageTitle?: string;
-  updatedAt?: string;
+/** One couple's isolated diary space (PIN is globally unique). */
+export interface SessionSummary {
+  id: string;
+  /** Admin list label, e.g. "小明&小红" */
+  name: string;
+  pin: string;
+  personA: string;
+  personB: string;
+  pageTitle: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
+export interface SessionRegistry {
+  sessions: SessionSummary[];
+  updatedAt: string;
+}
+
+/** Display defaults for SPA shells before a user session is known. */
 export interface ResolvedConfig {
-  pin: string;
   personA: string;
   personB: string;
   pageTitle: string;
@@ -62,8 +71,6 @@ export interface ResolvedConfig {
 
 export interface Env {
   DIARY_BUCKET: R2Bucket;
-  /** Fallback PIN from secret/var; may be overridden by settings.json */
-  DIARY_PIN: string;
   PAGE_TITLE: string;
   PERSON_A: string;
   PERSON_B: string;
@@ -74,6 +81,7 @@ export interface Env {
 
 export interface SessionPayload {
   ok: true;
+  sessionId: string;
   person: PersonId;
   exp: number;
 }

@@ -1,5 +1,4 @@
 # 复制本文件为 .dev.vars 供本地 wrangler dev 使用（已在 .gitignore）
-DIARY_PIN=123456
 PAGE_TITLE=我们的小本本
 PERSON_A=小A
 PERSON_B=小B

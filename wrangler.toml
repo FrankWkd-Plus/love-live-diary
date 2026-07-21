@@ -7,8 +7,8 @@ compatibility_date = "2025-05-01"
 binding = "DIARY_BUCKET"
 bucket_name = "diary-data"
 
-# 非敏感展示配置。敏感项用 secret：
-#   npx wrangler secret put DIARY_PIN
+# 非敏感展示默认值（登录前 SPA 占位；真实姓名/标题在会话里配置）。
+# 敏感项用 secret：
 #   npx wrangler secret put SESSION_SECRET
 #   npx wrangler secret put ADMIN_PASSWORD
 [vars]
@@ -17,7 +17,8 @@ PERSON_A = "小A"
 PERSON_B = "小B"
 
 # 本地开发默认值见 .dev.vars.example（复制为 .dev.vars）
-# 生产环境 DIARY_PIN / SESSION_SECRET / ADMIN_PASSWORD 通过 wrangler secret 注入
+# 生产环境 SESSION_SECRET / ADMIN_PASSWORD 通过 wrangler secret 注入
+# 用户 PIN 在 Admin「会话管理」中为每个会话单独设置，不再使用全局 DIARY_PIN
 
 [observability]
 enabled = true

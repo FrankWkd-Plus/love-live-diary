@@ -8,12 +8,19 @@ import type {
 import { randomId, signSession, verifySession } from "./crypto";
 import {
   createPage,
+  createSession,
+  defaultConfig,
   deletePage,
+  deleteSession,
+  findSessionByPin,
   getPage,
+  getSession,
   listPages,
-  resolveConfig,
+  listSessions,
   savePage,
-  saveSettings,
+  sessionToConfig,
+  StoreError,
+  updateSession,
 } from "./store";
 import { adminHtml } from "./admin";
 import { appHtml } from "./ui";
@@ -28,6 +35,9 @@ export default {
     try {
       return await handle(request, env);
     } catch (err) {
+      if (err instanceof StoreError) {
+        return json({ error: err.message }, err.status);
+      }
       console.error(err);
       const message = err instanceof Error ? err.message : "Internal error";
       return json({ error: message }, 500);
@@ -39,14 +49,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
-  const cfg = await resolveConfig(env);
+  const shell = defaultConfig(env);
 
   if (method === "GET" && (path === "/" || path === "/index.html")) {
-    return html(appHtml(cfg));
+    return html(appHtml(shell));
   }
 
   if (method === "GET" && (path === "/admin" || path === "/admin/")) {
-    return html(adminHtml(cfg));
+    return html(adminHtml(shell));
   }
 
   if (method === "GET" && path === "/api/health") {
@@ -55,7 +65,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
   /* ---------- User auth ---------- */
   if (method === "POST" && path === "/api/login") {
-    return login(request, env, cfg);
+    return login(request, env);
   }
   if (method === "POST" && path === "/api/logout") {
     return logout(request);
@@ -63,9 +73,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
   if (method === "GET" && path === "/api/me") {
     const session = await readSession(request, env);
     if (!session) return json({ authenticated: false });
+    const space = await getSession(env, session.sessionId);
+    if (!space) return json({ authenticated: false });
+    const cfg = sessionToConfig(space);
     return json({
       authenticated: true,
       person: session.person,
+      sessionId: session.sessionId,
+      sessionName: space.name,
       names: { A: cfg.personA, B: cfg.personB },
       title: cfg.pageTitle,
     });
@@ -73,20 +88,22 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
   /* ---------- Admin auth & APIs (before user session gate) ---------- */
   if (path.startsWith("/api/admin")) {
-    return handleAdmin(request, env, cfg, path, method);
+    return handleAdmin(request, env, path, method);
   }
 
   const session = await readSession(request, env);
   if (!session) return json({ error: "未登录" }, 401);
 
+  const sessionId = session.sessionId;
+
   if (method === "GET" && path === "/api/pages") {
-    const pages = await listPages(env);
+    const pages = await listPages(env, sessionId);
     return json({ pages });
   }
 
   if (method === "POST" && path === "/api/pages") {
     const body = await safeJson(request);
-    const page = await createPage(env, {
+    const page = await createPage(env, sessionId, {
       date: typeof body.date === "string" ? body.date : undefined,
       title: typeof body.title === "string" ? body.title : undefined,
     });
@@ -99,37 +116,44 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const rest = pageMatch[2] || "";
 
     if (method === "GET" && rest === "") {
-      const page = await getPage(env, pageId);
+      const page = await getPage(env, sessionId, pageId);
       if (!page) return json({ error: "页面不存在" }, 404);
       return json({ page });
     }
 
     if (method === "DELETE" && rest === "") {
-      const ok = await deletePage(env, pageId);
+      const ok = await deletePage(env, sessionId, pageId);
       if (!ok) return json({ error: "页面不存在" }, 404);
       return json({ ok: true });
     }
 
     if (method === "PATCH" && rest === "") {
-      return patchPage(request, env, pageId);
+      return patchPage(request, env, sessionId, pageId);
     }
 
     if (method === "PUT" && rest === "/entry") {
-      return putEntry(request, env, pageId, session.person);
+      return putEntry(request, env, sessionId, pageId, session.person);
     }
 
     if (method === "POST" && rest === "/annotations") {
-      return addAnnotation(request, env, pageId, session.person);
+      return addAnnotation(request, env, sessionId, pageId, session.person);
     }
 
     const annMatch = rest.match(/^\/annotations\/([^/]+)$/);
     if (annMatch) {
       const annId = decodeURIComponent(annMatch[1]!);
       if (method === "PATCH") {
-        return patchAnnotation(request, env, pageId, annId, session.person);
+        return patchAnnotation(
+          request,
+          env,
+          sessionId,
+          pageId,
+          annId,
+          session.person,
+        );
       }
       if (method === "DELETE") {
-        return removeAnnotation(env, pageId, annId, session.person);
+        return removeAnnotation(env, sessionId, pageId, annId, session.person);
       }
     }
   }
@@ -142,7 +166,6 @@ async function handle(request: Request, env: Env): Promise<Response> {
 async function handleAdmin(
   request: Request,
   env: Env,
-  cfg: Awaited<ReturnType<typeof resolveConfig>>,
   path: string,
   method: string,
 ): Promise<Response> {
@@ -155,93 +178,91 @@ async function handleAdmin(
   if (method === "GET" && path === "/api/admin/me") {
     const admin = await readAdminSession(request, env);
     if (!admin) return json({ authenticated: false });
-    return json({
-      authenticated: true,
-      role: "admin",
-      settings: {
-        pin: cfg.pin,
-        personA: cfg.personA,
-        personB: cfg.personB,
-        pageTitle: cfg.pageTitle,
-      },
-    });
+    return json({ authenticated: true, role: "admin" });
   }
 
   const admin = await readAdminSession(request, env);
   if (!admin) return json({ error: "管理员未登录" }, 401);
 
-  if (method === "GET" && path === "/api/admin/settings") {
-    return json({
-      pin: cfg.pin,
-      personA: cfg.personA,
-      personB: cfg.personB,
-      pageTitle: cfg.pageTitle,
-    });
+  if (method === "GET" && path === "/api/admin/sessions") {
+    const sessions = await listSessions(env);
+    return json({ sessions });
   }
 
-  if (method === "PUT" && path === "/api/admin/settings") {
+  if (method === "POST" && path === "/api/admin/sessions") {
     const body = await safeJson(request);
-    const patch: {
-      pin?: string;
-      personA?: string;
-      personB?: string;
-      pageTitle?: string;
-    } = {};
-    if (typeof body.pin === "string" && body.pin.trim()) {
-      if (body.pin.trim().length < 4) {
-        return json({ error: "PIN 至少 4 位" }, 400);
-      }
-      patch.pin = body.pin.trim();
-    }
-    if (typeof body.personA === "string" && body.personA.trim()) {
-      patch.personA = body.personA.trim();
-    }
-    if (typeof body.personB === "string" && body.personB.trim()) {
-      patch.personB = body.personB.trim();
-    }
-    if (typeof body.pageTitle === "string" && body.pageTitle.trim()) {
-      patch.pageTitle = body.pageTitle.trim();
-    }
-    if (!Object.keys(patch).length) {
-      return json({ error: "没有可更新的字段" }, 400);
-    }
-    await saveSettings(env, patch);
-    const next = await resolveConfig(env);
-    return json({
-      ok: true,
-      settings: {
-        pin: next.pin,
-        personA: next.personA,
-        personB: next.personB,
-        pageTitle: next.pageTitle,
-      },
+    const session = await createSession(env, {
+      name: typeof body.name === "string" ? body.name : "",
+      pin: typeof body.pin === "string" ? body.pin : "",
+      personA: typeof body.personA === "string" ? body.personA : undefined,
+      personB: typeof body.personB === "string" ? body.personB : undefined,
+      pageTitle: typeof body.pageTitle === "string" ? body.pageTitle : undefined,
     });
+    return json({ session }, 201);
   }
 
-  if (method === "GET" && path === "/api/admin/pages") {
-    const pages = await listPages(env);
-    return json({ pages });
-  }
+  const sessionMatch = path.match(
+    /^\/api\/admin\/sessions\/([^/]+)(?:\/(pages)(?:\/([^/]+))?)?$/,
+  );
+  if (sessionMatch) {
+    const sessionId = decodeURIComponent(sessionMatch[1]!);
+    const section = sessionMatch[2]; // "pages" | undefined
+    const pageId = sessionMatch[3]
+      ? decodeURIComponent(sessionMatch[3])
+      : null;
 
-  const pageMatch = path.match(/^\/api\/admin\/pages\/([^/]+)(.*)$/);
-  if (pageMatch) {
-    const pageId = decodeURIComponent(pageMatch[1]!);
-    const rest = pageMatch[2] || "";
-
-    if (method === "GET" && rest === "") {
-      const page = await getPage(env, pageId);
-      if (!page) return json({ error: "页面不存在" }, 404);
-      return json({ page });
+    if (!section) {
+      if (method === "GET") {
+        const session = await getSession(env, sessionId);
+        if (!session) return json({ error: "会话不存在" }, 404);
+        return json({ session });
+      }
+      if (method === "PUT") {
+        const body = await safeJson(request);
+        const session = await updateSession(env, sessionId, {
+          name: typeof body.name === "string" ? body.name : undefined,
+          pin: typeof body.pin === "string" ? body.pin : undefined,
+          personA: typeof body.personA === "string" ? body.personA : undefined,
+          personB: typeof body.personB === "string" ? body.personB : undefined,
+          pageTitle:
+            typeof body.pageTitle === "string" ? body.pageTitle : undefined,
+        });
+        return json({ session });
+      }
+      if (method === "DELETE") {
+        const ok = await deleteSession(env, sessionId);
+        if (!ok) return json({ error: "会话不存在" }, 404);
+        return json({ ok: true });
+      }
+      return json({ error: "Method not allowed" }, 405);
     }
 
-    if (method === "DELETE" && rest === "") {
-      const ok = await deletePage(env, pageId);
-      if (!ok) return json({ error: "页面不存在" }, 404);
-      return json({ ok: true });
+    // pages
+    if (section === "pages" && !pageId) {
+      if (method === "GET") {
+        const session = await getSession(env, sessionId);
+        if (!session) return json({ error: "会话不存在" }, 404);
+        const pages = await listPages(env, sessionId);
+        return json({ pages, session });
+      }
+      return json({ error: "Method not allowed" }, 405);
     }
 
-    if (method === "PUT" && rest === "") {
-      return adminUpdatePage(request, env, pageId);
+    if (section === "pages" && pageId) {
+      if (method === "GET") {
+        const page = await getPage(env, sessionId, pageId);
+        if (!page) return json({ error: "页面不存在" }, 404);
+        return json({ page });
+      }
+      if (method === "DELETE") {
+        const ok = await deletePage(env, sessionId, pageId);
+        if (!ok) return json({ error: "页面不存在" }, 404);
+        return json({ ok: true });
+      }
+      if (method === "PUT") {
+        return adminUpdatePage(request, env, sessionId, pageId);
+      }
+      return json({ error: "Method not allowed" }, 405);
     }
   }
 
@@ -296,9 +317,10 @@ async function readAdminSession(
 async function adminUpdatePage(
   request: Request,
   env: Env,
+  sessionId: string,
   pageId: string,
 ): Promise<Response> {
-  const page = await getPage(env, pageId);
+  const page = await getPage(env, sessionId, pageId);
   if (!page) return json({ error: "页面不存在" }, 404);
   const body = await safeJson(request);
 
@@ -323,36 +345,39 @@ async function adminUpdatePage(
       }
     }
   }
-  // Admin may also replace annotations wholesale if provided
   if (Array.isArray(body.annotations)) {
     page.annotations = body.annotations as Annotation[];
   }
 
-  const saved = await savePage(env, page);
+  const saved = await savePage(env, sessionId, page);
   return json({ page: saved });
 }
 
 /* ---------- User auth ---------- */
 
-async function login(
-  request: Request,
-  env: Env,
-  cfg: Awaited<ReturnType<typeof resolveConfig>>,
-): Promise<Response> {
+async function login(request: Request, env: Env): Promise<Response> {
   const body = await safeJson(request);
   const pin = String(body.pin ?? "");
   const person: PersonId | null =
     body.person === "B" ? "B" : body.person === "A" ? "A" : null;
 
   if (!person) return json({ error: "请选择身份（A 或 B）" }, 400);
-  if (pin !== cfg.pin) return json({ error: "PIN 不正确" }, 401);
+
+  const space = await findSessionByPin(env, pin);
+  if (!space) return json({ error: "PIN 不正确" }, 401);
 
   const exp = Date.now() + SESSION_TTL_MS;
   const token = await signSession(
-    { ok: true, person, exp } satisfies SessionPayload,
+    {
+      ok: true,
+      sessionId: space.id,
+      person,
+      exp,
+    } satisfies SessionPayload,
     env.SESSION_SECRET,
   );
 
+  const cfg = sessionToConfig(space);
   const headers = new Headers({ "Content-Type": "application/json" });
   headers.append(
     "Set-Cookie",
@@ -362,6 +387,8 @@ async function login(
     JSON.stringify({
       ok: true,
       person,
+      sessionId: space.id,
+      sessionName: space.name,
       names: { A: cfg.personA, B: cfg.personB },
       title: cfg.pageTitle,
     }),
@@ -402,6 +429,7 @@ async function readSession(
   if (!payload || !payload.ok) return null;
   if (typeof payload.exp !== "number" || payload.exp < Date.now()) return null;
   if (payload.person !== "A" && payload.person !== "B") return null;
+  if (typeof payload.sessionId !== "string" || !payload.sessionId) return null;
   return payload;
 }
 
@@ -410,10 +438,11 @@ async function readSession(
 async function putEntry(
   request: Request,
   env: Env,
+  sessionId: string,
   pageId: string,
   person: PersonId,
 ): Promise<Response> {
-  const page = await getPage(env, pageId);
+  const page = await getPage(env, sessionId, pageId);
   if (!page) return json({ error: "页面不存在" }, 404);
 
   const body = await safeJson(request);
@@ -430,16 +459,17 @@ async function putEntry(
     body: body.body,
     updatedAt: new Date().toISOString(),
   };
-  const saved = await savePage(env, page);
+  const saved = await savePage(env, sessionId, page);
   return json({ page: saved });
 }
 
 async function patchPage(
   request: Request,
   env: Env,
+  sessionId: string,
   pageId: string,
 ): Promise<Response> {
-  const page = await getPage(env, pageId);
+  const page = await getPage(env, sessionId, pageId);
   if (!page) return json({ error: "页面不存在" }, 404);
   const body = await safeJson(request);
   if (typeof body.title === "string" && body.title.trim()) {
@@ -448,17 +478,18 @@ async function patchPage(
   if (typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
     page.date = body.date;
   }
-  const saved = await savePage(env, page);
+  const saved = await savePage(env, sessionId, page);
   return json({ page: saved });
 }
 
 async function addAnnotation(
   request: Request,
   env: Env,
+  sessionId: string,
   pageId: string,
   person: PersonId,
 ): Promise<Response> {
-  const page = await getPage(env, pageId);
+  const page = await getPage(env, sessionId, pageId);
   if (!page) return json({ error: "页面不存在" }, 404);
 
   const body = await safeJson(request);
@@ -502,18 +533,19 @@ async function addAnnotation(
   };
 
   page.annotations.push(ann);
-  const saved = await savePage(env, page);
+  const saved = await savePage(env, sessionId, page);
   return json({ page: saved, annotation: ann }, 201);
 }
 
 async function patchAnnotation(
   request: Request,
   env: Env,
+  sessionId: string,
   pageId: string,
   annId: string,
   person: PersonId,
 ): Promise<Response> {
-  const page = await getPage(env, pageId);
+  const page = await getPage(env, sessionId, pageId);
   if (!page) return json({ error: "页面不存在" }, 404);
   const idx = page.annotations.findIndex((a) => a.id === annId);
   if (idx < 0) return json({ error: "批注不存在" }, 404);
@@ -528,24 +560,25 @@ async function patchAnnotation(
     ann.updatedAt = new Date().toISOString();
   }
   page.annotations[idx] = ann;
-  const saved = await savePage(env, page);
+  const saved = await savePage(env, sessionId, page);
   return json({ page: saved, annotation: ann });
 }
 
 async function removeAnnotation(
   env: Env,
+  sessionId: string,
   pageId: string,
   annId: string,
   person: PersonId,
 ): Promise<Response> {
-  const page = await getPage(env, pageId);
+  const page = await getPage(env, sessionId, pageId);
   if (!page) return json({ error: "页面不存在" }, 404);
   const ann = page.annotations.find((a) => a.id === annId);
   if (!ann) return json({ error: "批注不存在" }, 404);
   if (ann.author !== person) return json({ error: "只能删除自己的批注" }, 403);
 
   page.annotations = page.annotations.filter((a) => a.id !== annId);
-  const saved = await savePage(env, page);
+  const saved = await savePage(env, sessionId, page);
   return json({ page: saved });
 }
 
@@ -580,3 +613,4 @@ async function safeJson(request: Request): Promise<Record<string, unknown>> {
   }
   return {};
 }
+

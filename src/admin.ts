@@ -8,7 +8,7 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Admin console SPA at /admin */
+/** Admin console SPA at /admin — multi-session management. */
 export function adminHtml(cfg: ResolvedConfig): string {
   const title = esc((cfg.pageTitle || "我们的小本本") + " · 管理");
   const nameA = esc(cfg.personA || "小A");
@@ -118,7 +118,7 @@ export function adminHtml(cfg: ResolvedConfig): string {
 
   .layout {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 300px 1fr;
     min-height: 0;
   }
   @media (max-width: 900px) {
@@ -128,9 +128,19 @@ export function adminHtml(cfg: ResolvedConfig): string {
     border-right: 1px solid var(--line);
     padding: 14px;
     overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
   main { padding: 16px 18px 40px; overflow: auto; min-width: 0; }
-  h2 { margin: 0 0 12px; font-size: 15px; color: var(--muted); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  h2 {
+    margin: 0 0 12px;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
   .panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -140,11 +150,11 @@ export function adminHtml(cfg: ResolvedConfig): string {
   }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
   .actions .primary { width: auto; padding: 9px 14px; }
 
-  .page-list { list-style: none; margin: 0; padding: 0; }
-  .page-list li button {
+  .session-list, .page-list { list-style: none; margin: 0; padding: 0; }
+  .session-list li button, .page-list li button {
     width: 100%;
     text-align: left;
     padding: 10px 12px;
@@ -152,13 +162,14 @@ export function adminHtml(cfg: ResolvedConfig): string {
     border: 1px solid transparent;
     margin-bottom: 6px;
   }
-  .page-list li button:hover { background: #121722; }
-  .page-list li button.active {
+  .session-list li button:hover, .page-list li button:hover { background: #121722; }
+  .session-list li button.active, .page-list li button.active {
     border-color: var(--line);
     background: #121722;
   }
-  .page-list .t { font-weight: 600; font-size: 14px; }
-  .page-list .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .t { font-weight: 600; font-size: 14px; }
+  .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .pin-mask { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.04em; }
 
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
@@ -185,13 +196,24 @@ export function adminHtml(cfg: ResolvedConfig): string {
     border-radius: 0 8px 8px 0;
   }
   .status { font-size: 13px; color: var(--muted); min-height: 1.2em; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #1b2433;
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  .side-actions { display: flex; gap: 8px; }
+  .side-actions .primary { width: auto; padding: 8px 12px; font-size: 13px; }
 </style>
 </head>
 <body>
   <div id="login">
     <div class="card">
       <h1>管理后台</h1>
-      <div class="sub">查看 / 修改日记，更新共享 PIN 与双方姓名。</div>
+      <div class="sub">管理多组会话：各自 PIN、姓名与日记页完全隔离。</div>
       <div class="field">
         <label>管理员密码</label>
         <input id="admin-pass" type="password" autocomplete="current-password" placeholder="Admin password" />
@@ -204,45 +226,60 @@ export function adminHtml(cfg: ResolvedConfig): string {
 
   <div id="app" class="hidden">
     <header>
-      <h1>管理 · ${title.replace(/ · 管理$/, "")}</h1>
+      <h1>管理 · 会话</h1>
       <a class="ghost" href="/" style="text-decoration:none">日记本</a>
       <button type="button" class="ghost" id="logout-btn">退出</button>
     </header>
     <div class="layout">
       <aside>
-        <h2>日记页</h2>
-        <ul class="page-list" id="page-list"></ul>
+        <div>
+          <h2>会话</h2>
+          <div class="side-actions" style="margin-bottom:10px">
+            <button type="button" class="primary" id="new-session-btn">+ 新建会话</button>
+          </div>
+          <ul class="session-list" id="session-list"></ul>
+        </div>
+        <div>
+          <h2>日记页 <span class="badge" id="session-badge">未选择</span></h2>
+          <ul class="page-list" id="page-list"></ul>
+        </div>
       </aside>
       <main>
-        <div class="panel">
-          <h2>空间设置</h2>
+        <div class="panel" id="session-form-panel">
+          <h2 id="session-form-title">新建会话</h2>
           <div class="row">
             <div class="field">
-              <label>共同 PIN</label>
-              <input id="set-pin" type="text" autocomplete="off" />
+              <label>会话名称</label>
+              <input id="ses-name" type="text" placeholder="例如：小明 &amp; 小红" />
             </div>
             <div class="field">
-              <label>页面标题</label>
-              <input id="set-title" type="text" />
+              <label>共享 PIN（全局唯一）</label>
+              <input id="ses-pin" type="text" autocomplete="off" placeholder="至少 4 位" />
             </div>
             <div class="field">
               <label>身份 A 姓名</label>
-              <input id="set-a" type="text" value="${nameA}" />
+              <input id="ses-a" type="text" value="${nameA}" />
             </div>
             <div class="field">
               <label>身份 B 姓名</label>
-              <input id="set-b" type="text" value="${nameB}" />
+              <input id="ses-b" type="text" value="${nameB}" />
+            </div>
+            <div class="field" style="grid-column: 1 / -1">
+              <label>页面标题</label>
+              <input id="ses-title" type="text" placeholder="我们的小本本" />
             </div>
           </div>
           <div class="actions">
-            <button type="button" class="primary" id="save-settings">保存设置</button>
-            <span class="status" id="settings-status"></span>
+            <button type="button" class="primary" id="save-session">创建会话</button>
+            <button type="button" class="ghost danger hidden" id="delete-session">删除会话</button>
+            <button type="button" class="ghost hidden" id="cancel-edit">取消编辑</button>
+            <span class="status" id="session-status"></span>
           </div>
         </div>
 
         <div class="panel" id="page-panel">
           <h2>编辑日记页</h2>
-          <div id="page-empty" class="status">从左侧选择一页进行查看与修改。</div>
+          <div id="page-empty" class="status">先选择左侧会话，再选择日记页进行查看与修改。</div>
           <div id="page-editor" class="hidden">
             <div class="row">
               <div class="field">
@@ -279,10 +316,14 @@ export function adminHtml(cfg: ResolvedConfig): string {
 <script>
 (() => {
   const state = {
+    sessions: [],
+    currentSessionId: null,
+    editingSessionId: null, // null = create mode
     pages: [],
-    currentId: null,
+    currentPageId: null,
     page: null,
     names: { A: ${JSON.stringify(cfg.personA || "小A")}, B: ${JSON.stringify(cfg.personB || "小B")} },
+    showPins: {},
   };
 
   const $ = (id) => document.getElementById(id);
@@ -304,6 +345,14 @@ export function adminHtml(cfg: ResolvedConfig): string {
     if (!iso) return "—";
     try { return new Date(iso).toLocaleString("zh-CN", { hour12: false }); }
     catch { return iso; }
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
   $("login-btn").addEventListener("click", doLogin);
@@ -332,7 +381,6 @@ export function adminHtml(cfg: ResolvedConfig): string {
     try {
       const me = await api("/api/admin/me");
       if (me.authenticated) {
-        applySettings(me.settings);
         await enterApp();
         return;
       }
@@ -343,73 +391,221 @@ export function adminHtml(cfg: ResolvedConfig): string {
   async function enterApp() {
     $("login").classList.add("hidden");
     $("app").classList.remove("hidden");
-    await loadSettings();
-    await refreshPages();
+    resetSessionForm();
+    await refreshSessions();
   }
 
-  function applySettings(s) {
+  function currentSession() {
+    return state.sessions.find((s) => s.id === state.currentSessionId) || null;
+  }
+
+  function resetSessionForm() {
+    state.editingSessionId = null;
+    $("session-form-title").textContent = "新建会话";
+    $("ses-name").value = "";
+    $("ses-pin").value = "";
+    $("ses-a").value = ${JSON.stringify(cfg.personA || "小A")};
+    $("ses-b").value = ${JSON.stringify(cfg.personB || "小B")};
+    $("ses-title").value = ${JSON.stringify(cfg.pageTitle || "我们的小本本")};
+    $("save-session").textContent = "创建会话";
+    $("delete-session").classList.add("hidden");
+    $("cancel-edit").classList.add("hidden");
+    $("session-status").textContent = "";
+    $("session-status").className = "status";
+  }
+
+  function fillSessionForm(s) {
+    state.editingSessionId = s.id;
+    $("session-form-title").textContent = "编辑会话";
+    $("ses-name").value = s.name || "";
+    $("ses-pin").value = s.pin || "";
+    $("ses-a").value = s.personA || "";
+    $("ses-b").value = s.personB || "";
+    $("ses-title").value = s.pageTitle || "";
+    $("save-session").textContent = "保存会话";
+    $("delete-session").classList.remove("hidden");
+    $("cancel-edit").classList.remove("hidden");
+    $("session-status").textContent = "";
+    $("session-status").className = "status";
+  }
+
+  $("new-session-btn").addEventListener("click", () => {
+    resetSessionForm();
+    $("ses-name").focus();
+  });
+  $("cancel-edit").addEventListener("click", () => resetSessionForm());
+
+  async function refreshSessions() {
+    const data = await api("/api/admin/sessions");
+    state.sessions = data.sessions || [];
+    renderSessionList();
+    if (state.currentSessionId) {
+      const still = state.sessions.some((s) => s.id === state.currentSessionId);
+      if (still) {
+        applySessionLabels(currentSession());
+        await refreshPages();
+      } else {
+        state.currentSessionId = null;
+        clearPageEditor();
+        state.pages = [];
+        renderPageList();
+        $("session-badge").textContent = "未选择";
+      }
+    }
+  }
+
+  function renderSessionList() {
+    const ul = $("session-list");
+    ul.innerHTML = "";
+    if (!state.sessions.length) {
+      ul.innerHTML = '<li class="status">暂无会话，请先创建</li>';
+      return;
+    }
+    for (const s of state.sessions) {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = s.id === state.currentSessionId ? "active" : "";
+      const show = !!state.showPins[s.id];
+      const pinText = show ? (s.pin || "") : "••••";
+      btn.innerHTML =
+        '<div class="t"></div>' +
+        '<div class="d"></div>' +
+        '<div class="d pin-mask"></div>';
+      btn.querySelector(".t").textContent = s.name || s.id;
+      btn.querySelectorAll(".d")[0].textContent =
+        (s.personA || "A") + " / " + (s.personB || "B") + " · " + fmt(s.updatedAt);
+      const pinEl = btn.querySelectorAll(".d")[1];
+      pinEl.textContent = "PIN " + pinText + "  (点此切换显示)";
+      pinEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        state.showPins[s.id] = !state.showPins[s.id];
+        renderSessionList();
+      });
+      btn.addEventListener("click", () => selectSession(s.id));
+      btn.addEventListener("dblclick", () => {
+        selectSession(s.id);
+        fillSessionForm(s);
+      });
+      li.appendChild(btn);
+      ul.appendChild(li);
+    }
+  }
+
+  function applySessionLabels(s) {
     if (!s) return;
-    $("set-pin").value = s.pin || "";
-    $("set-title").value = s.pageTitle || "";
-    $("set-a").value = s.personA || "";
-    $("set-b").value = s.personB || "";
     state.names.A = s.personA || state.names.A;
     state.names.B = s.personB || state.names.B;
     $("lab-a").textContent = state.names.A;
     $("lab-b").textContent = state.names.B;
+    $("session-badge").textContent = s.name || s.id;
   }
 
-  async function loadSettings() {
-    const s = await api("/api/admin/settings");
-    applySettings(s);
+  async function selectSession(id) {
+    state.currentSessionId = id;
+    const s = currentSession();
+    applySessionLabels(s);
+    renderSessionList();
+    clearPageEditor();
+    await refreshPages();
   }
 
-  $("save-settings").addEventListener("click", async () => {
-    const status = $("settings-status");
+  $("save-session").addEventListener("click", async () => {
+    const status = $("session-status");
     status.textContent = "保存中…";
     status.className = "status";
+    const payload = {
+      name: $("ses-name").value,
+      pin: $("ses-pin").value,
+      personA: $("ses-a").value,
+      personB: $("ses-b").value,
+      pageTitle: $("ses-title").value,
+    };
     try {
-      const data = await api("/api/admin/settings", {
-        method: "PUT",
-        body: JSON.stringify({
-          pin: $("set-pin").value,
-          pageTitle: $("set-title").value,
-          personA: $("set-a").value,
-          personB: $("set-b").value,
-        }),
-      });
-      applySettings(data.settings);
+      let data;
+      if (state.editingSessionId) {
+        data = await api(
+          "/api/admin/sessions/" + encodeURIComponent(state.editingSessionId),
+          { method: "PUT", body: JSON.stringify(payload) },
+        );
+      } else {
+        data = await api("/api/admin/sessions", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
       status.textContent = "已保存";
       status.className = "status ok";
+      await refreshSessions();
+      if (data.session) {
+        await selectSession(data.session.id);
+        fillSessionForm(data.session);
+      }
     } catch (e) {
       status.textContent = e.message || "保存失败";
       status.className = "status error";
     }
   });
 
+  $("delete-session").addEventListener("click", async () => {
+    if (!state.editingSessionId) return;
+    const s = state.sessions.find((x) => x.id === state.editingSessionId);
+    const label = (s && s.name) || state.editingSessionId;
+    if (!confirm("确定删除会话「" + label + "」？将清除该会话全部日记，不可恢复。")) return;
+    try {
+      await api(
+        "/api/admin/sessions/" + encodeURIComponent(state.editingSessionId),
+        { method: "DELETE" },
+      );
+      if (state.currentSessionId === state.editingSessionId) {
+        state.currentSessionId = null;
+        clearPageEditor();
+        state.pages = [];
+        renderPageList();
+        $("session-badge").textContent = "未选择";
+      }
+      resetSessionForm();
+      await refreshSessions();
+    } catch (e) {
+      alert(e.message || "删除失败");
+    }
+  });
+
   async function refreshPages() {
-    const data = await api("/api/admin/pages");
+    if (!state.currentSessionId) {
+      state.pages = [];
+      renderPageList();
+      return;
+    }
+    const data = await api(
+      "/api/admin/sessions/" + encodeURIComponent(state.currentSessionId) + "/pages",
+    );
     state.pages = data.pages || [];
-    renderList();
-    if (state.currentId) {
-      const still = state.pages.some((p) => p.id === state.currentId);
-      if (still) await openPage(state.currentId);
-      else clearEditor();
+    if (data.session) applySessionLabels(data.session);
+    renderPageList();
+    if (state.currentPageId) {
+      const still = state.pages.some((p) => p.id === state.currentPageId);
+      if (still) await openPage(state.currentPageId);
+      else clearPageEditor();
     }
   }
 
-  function renderList() {
+  function renderPageList() {
     const ul = $("page-list");
     ul.innerHTML = "";
+    if (!state.currentSessionId) {
+      ul.innerHTML = '<li class="status">请先选择会话</li>';
+      return;
+    }
     if (!state.pages.length) {
-      ul.innerHTML = '<li class="status">暂无日记页</li>';
+      ul.innerHTML = '<li class="status">此会话暂无日记页</li>';
       return;
     }
     for (const p of state.pages) {
       const li = document.createElement("li");
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = p.id === state.currentId ? "active" : "";
+      btn.className = p.id === state.currentPageId ? "active" : "";
       btn.innerHTML = '<div class="t"></div><div class="d"></div>';
       btn.querySelector(".t").textContent = p.title || p.date;
       btn.querySelector(".d").textContent = p.date + " · " + fmt(p.updatedAt);
@@ -419,26 +615,34 @@ export function adminHtml(cfg: ResolvedConfig): string {
     }
   }
 
-  function clearEditor() {
-    state.currentId = null;
+  function clearPageEditor() {
+    state.currentPageId = null;
     state.page = null;
     $("page-empty").classList.remove("hidden");
     $("page-editor").classList.add("hidden");
   }
 
   async function openPage(id) {
-    const data = await api("/api/admin/pages/" + encodeURIComponent(id));
-    state.currentId = id;
+    if (!state.currentSessionId) return;
+    const data = await api(
+      "/api/admin/sessions/" +
+        encodeURIComponent(state.currentSessionId) +
+        "/pages/" +
+        encodeURIComponent(id),
+    );
+    state.currentPageId = id;
     state.page = data.page;
     $("page-empty").classList.add("hidden");
     $("page-editor").classList.remove("hidden");
     $("pg-title").value = state.page.title || "";
     $("pg-date").value = state.page.date || "";
-    $("pg-a").value = (state.page.entries && state.page.entries.A && state.page.entries.A.body) || "";
-    $("pg-b").value = (state.page.entries && state.page.entries.B && state.page.entries.B.body) || "";
+    $("pg-a").value =
+      (state.page.entries && state.page.entries.A && state.page.entries.A.body) || "";
+    $("pg-b").value =
+      (state.page.entries && state.page.entries.B && state.page.entries.B.body) || "";
     $("page-status").textContent = "";
     renderAnns();
-    renderList();
+    renderPageList();
   }
 
   function renderAnns() {
@@ -451,40 +655,45 @@ export function adminHtml(cfg: ResolvedConfig): string {
     box.innerHTML = anns.map((a) => {
       const who = a.author === "B" ? state.names.B : state.names.A;
       const tgt = a.target === "B" ? state.names.B : state.names.A;
-      return '<div class="ann-item"><strong>' + escapeHtml(who) +
-        '</strong> 批 ' + escapeHtml(tgt) +
-        ' · 「' + escapeHtml(a.quote || "") + '」<br/>' +
+      return (
+        '<div class="ann-item"><strong>' +
+        escapeHtml(who) +
+        "</strong> 批 " +
+        escapeHtml(tgt) +
+        " · 「" +
+        escapeHtml(a.quote || "") +
+        "」<br/>" +
         escapeHtml(a.content || "") +
-        '<div style="margin-top:4px;opacity:.7">' + escapeHtml(fmt(a.createdAt)) +
-        '</div></div>';
+        '<div style="margin-top:4px;opacity:.7">' +
+        escapeHtml(fmt(a.createdAt)) +
+        "</div></div>"
+      );
     }).join("");
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
   $("save-page").addEventListener("click", async () => {
-    if (!state.page) return;
+    if (!state.page || !state.currentSessionId) return;
     const status = $("page-status");
     status.textContent = "保存中…";
     status.className = "status";
     try {
-      const data = await api("/api/admin/pages/" + encodeURIComponent(state.page.id), {
-        method: "PUT",
-        body: JSON.stringify({
-          title: $("pg-title").value,
-          date: $("pg-date").value,
-          entries: {
-            A: { body: $("pg-a").value },
-            B: { body: $("pg-b").value },
-          },
-        }),
-      });
+      const data = await api(
+        "/api/admin/sessions/" +
+          encodeURIComponent(state.currentSessionId) +
+          "/pages/" +
+          encodeURIComponent(state.page.id),
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            title: $("pg-title").value,
+            date: $("pg-date").value,
+            entries: {
+              A: { body: $("pg-a").value },
+              B: { body: $("pg-b").value },
+            },
+          }),
+        },
+      );
       state.page = data.page;
       status.textContent = "已保存 " + fmt(state.page.updatedAt);
       status.className = "status ok";
@@ -496,11 +705,17 @@ export function adminHtml(cfg: ResolvedConfig): string {
   });
 
   $("delete-page").addEventListener("click", async () => {
-    if (!state.page) return;
+    if (!state.page || !state.currentSessionId) return;
     if (!confirm("确定删除这一页？不可恢复。")) return;
     try {
-      await api("/api/admin/pages/" + encodeURIComponent(state.page.id), { method: "DELETE" });
-      clearEditor();
+      await api(
+        "/api/admin/sessions/" +
+          encodeURIComponent(state.currentSessionId) +
+          "/pages/" +
+          encodeURIComponent(state.page.id),
+        { method: "DELETE" },
+      );
+      clearPageEditor();
       await refreshPages();
     } catch (e) {
       alert(e.message || "删除失败");

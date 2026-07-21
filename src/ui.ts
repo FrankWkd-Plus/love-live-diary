@@ -550,10 +550,10 @@ export function appHtml(cfg: ResolvedConfig): string {
   <div id="login">
     <div class="login-card">
       <h1>${title}</h1>
-      <div class="sub">输入共享 PIN，选择你是谁，进入共同日记本。</div>
+      <div class="sub">输入你们的共享 PIN，选择你是谁，进入对应的共同日记本。</div>
       <div class="field">
         <label>PIN</label>
-        <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="六位或更长" />
+        <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="由管理员分配的 PIN" />
       </div>
       <div class="field">
         <label>我是</label>
