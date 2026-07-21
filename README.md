@@ -34,7 +34,7 @@
 - Cloudflare Workers（API + 内嵌 SPA，**无前端构建**）
 - Cloudflare R2 存 JSON
 - HMAC 签名 Cookie（用户 30 天 / 管理员 12 小时）
-- GitHub Actions 自动部署（push `main`）
+- 手动部署：`npm run deploy`
 
 ---
 
@@ -93,17 +93,6 @@ PERSON_B = "小B"
 ```
 
 真实姓名、标题、暗号均在 Admin **会话**中配置。
-
-### 5. GitHub Actions
-
-仓库含 `.github/workflows/deploy.yml`。在 **Settings → Secrets** 添加：
-
-| Secret | 说明 |
-|--------|------|
-| `CLOUDFLARE_API_TOKEN` | Workers / Account / R2 权限 |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID |
-
-`SESSION_SECRET` / `ADMIN_PASSWORD` 仍用 `wrangler secret put`，不经过 GitHub。
 
 ---
 
