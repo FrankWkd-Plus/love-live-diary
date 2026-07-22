@@ -19,10 +19,12 @@
 - 登录页文案：placeholder「对暗号啦」；标题下无多余说明
 - 共同日记本：按页管理（日期 + 标题）
 - 每页左右双栏卡片，只能编辑自己那一栏
+- **每日话题**：一页一个共享话题，双方可回复讨论
+- **图片**：编辑时从相册/拍照添加，或粘贴剪贴板图片（iOS/Android 友好）
 - 划选任意一侧正文（含自己）→「添加批注」
 - 荧光高亮与右侧批注列表联动；**悬停高亮可预览批注**
-- 批注可编辑 / 删除（仅作者本人）
-- 笔记本 📓 favicon；暖色纸质感界面
+- 批注 / 图片 / 页 / 回复删除均有**二次确认**
+- 笔记本 📓 favicon；暖色纸质感界面；移动端适配
 
 ### 管理端 `/admin`
 - **会话管理**：创建 / 编辑 / **删除会话**（连带清空该会话全部日记）
@@ -141,6 +143,12 @@ Admin 创建会话（暗号 + 姓名）
 | GET/POST | `/api/pages` | 列表 / 新建 |
 | GET/PATCH/DELETE | `/api/pages/:id` | 详情 / 改标题日期 / 删除 |
 | PUT | `/api/pages/:id/entry` | 保存自己的正文 |
+| PUT | `/api/pages/:id/topic` | 设置/清空每日话题 `{ text }` |
+| POST | `/api/pages/:id/topic/replies` | 发表话题回复 |
+| PATCH/DELETE | `/api/pages/:id/topic/replies/:rid` | 编辑/删除自己的回复 |
+| POST | `/api/pages/:id/images` | 上传图片（multipart `file`） |
+| DELETE | `/api/pages/:id/images/:imgId` | 删除自己的图片 |
+| GET | `/api/media/:id` | 读取会话内图片二进制 |
 | POST/PATCH/DELETE | `/api/pages/:id/annotations[/:annId]` | 批注 CRUD |
 
 Cookie 含 `sessionId`；页操作仅限当前会话。
@@ -192,9 +200,11 @@ sessions/<sessionId>/pages/<pageId>.json
   "date": "2026-07-21",
   "title": "今天",
   "entries": {
-    "A": { "body": "...", "updatedAt": "..." },
+    "A": { "body": "...", "updatedAt": "...", "images": [{ "id": "img_...", "contentType": "image/jpeg", "size": 123, "createdAt": "...", "author": "A" }] },
     "B": { "body": "...", "updatedAt": "..." }
   },
+  "topic": { "text": "今天最开心的事？", "setBy": "A", "updatedAt": "..." },
+  "topicReplies": [{ "id": "tr_...", "author": "B", "content": "...", "createdAt": "...", "updatedAt": "..." }],
   "annotations": [{
     "id": "ann_...",
     "author": "A",

@@ -1,7 +1,9 @@
 import type {
   DiaryMeta,
   Env,
+  MediaRef,
   Page,
+  PersonId,
   ResolvedConfig,
   SessionRegistry,
   SessionSummary,
@@ -9,18 +11,41 @@ import type {
 import { randomId } from "./crypto";
 
 const REGISTRY_KEY = "sessions.json";
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4 MiB per image (R2/Worker friendly)
 
 const sessionMetaKey = (sessionId: string) => `sessions/${sessionId}/meta.json`;
 const sessionPageKey = (sessionId: string, pageId: string) =>
   `sessions/${sessionId}/pages/${pageId}.json`;
 const sessionPrefix = (sessionId: string) => `sessions/${sessionId}/`;
+const mediaKey = (sessionId: string, mediaId: string) =>
+  `sessions/${sessionId}/media/${mediaId}`;
 
 function emptyMeta(): DiaryMeta {
   return { pages: [], updatedAt: new Date().toISOString() };
 }
 
 function emptyEntry() {
-  return { body: "", updatedAt: null as string | null };
+  return { body: "", updatedAt: null as string | null, images: [] as MediaRef[] };
+}
+
+function emptyTopic() {
+  return {
+    text: "",
+    setBy: null as PersonId | null,
+    updatedAt: null as string | null,
+  };
+}
+
+/** Ensure pages loaded from older data have topic/images fields. */
+export function normalizePage(page: Page): Page {
+  if (!page.topic) page.topic = emptyTopic();
+  if (!Array.isArray(page.topicReplies)) page.topicReplies = [];
+  for (const p of ["A", "B"] as const) {
+    if (!page.entries[p]) page.entries[p] = emptyEntry();
+    if (!Array.isArray(page.entries[p].images)) page.entries[p].images = [];
+  }
+  if (!Array.isArray(page.annotations)) page.annotations = [];
+  return page;
 }
 
 function emptyRegistry(): SessionRegistry {
@@ -256,7 +281,7 @@ export async function getPage(
 ): Promise<Page | null> {
   const obj = await env.DIARY_BUCKET.get(sessionPageKey(sessionId, id));
   if (!obj) return null;
-  return (await obj.json()) as Page;
+  return normalizePage((await obj.json()) as Page);
 }
 
 export async function createPage(
@@ -275,6 +300,8 @@ export async function createPage(
     title: input.title?.trim() || date,
     entries: { A: emptyEntry(), B: emptyEntry() },
     annotations: [],
+    topic: emptyTopic(),
+    topicReplies: [],
     createdAt: now,
     updatedAt: now,
   };
@@ -333,6 +360,16 @@ export async function deletePage(
 ): Promise<boolean> {
   const existing = await getPage(env, sessionId, id);
   if (!existing) return false;
+
+  // Remove attached media objects
+  const mediaIds = new Set<string>();
+  for (const p of ["A", "B"] as const) {
+    for (const img of existing.entries[p].images || []) mediaIds.add(img.id);
+  }
+  await Promise.all(
+    [...mediaIds].map((mid) => env.DIARY_BUCKET.delete(mediaKey(sessionId, mid))),
+  );
+
   await env.DIARY_BUCKET.delete(sessionPageKey(sessionId, id));
   const meta = await getMeta(env, sessionId);
   meta.pages = meta.pages.filter((p) => p.id !== id);
@@ -340,6 +377,86 @@ export async function deletePage(
   await touchSession(env, sessionId);
   return true;
 }
+
+/* ---------- Media (images) ---------- */
+
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+]);
+
+export async function putMedia(
+  env: Env,
+  sessionId: string,
+  input: {
+    bytes: ArrayBuffer;
+    contentType: string;
+    author: PersonId;
+  },
+): Promise<MediaRef> {
+  const contentType = (input.contentType || "application/octet-stream")
+    .split(";")[0]!
+    .trim()
+    .toLowerCase();
+  if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
+    throw new StoreError("仅支持 JPEG / PNG / WebP / GIF / HEIC 图片");
+  }
+  if (input.bytes.byteLength <= 0) {
+    throw new StoreError("空文件");
+  }
+  if (input.bytes.byteLength > MAX_IMAGE_BYTES) {
+    throw new StoreError("图片不能超过 4MB，请压缩后再试");
+  }
+
+  const id = randomId("img");
+  const now = new Date().toISOString();
+  await env.DIARY_BUCKET.put(mediaKey(sessionId, id), input.bytes, {
+    httpMetadata: {
+      contentType,
+      cacheControl: "private, max-age=31536000, immutable",
+    },
+    customMetadata: {
+      author: input.author,
+      createdAt: now,
+    },
+  });
+
+  return {
+    id,
+    contentType,
+    size: input.bytes.byteLength,
+    createdAt: now,
+    author: input.author,
+  };
+}
+
+export async function getMediaObject(
+  env: Env,
+  sessionId: string,
+  mediaId: string,
+): Promise<R2ObjectBody | null> {
+  if (!mediaId || mediaId.includes("/") || mediaId.includes("..")) return null;
+  return env.DIARY_BUCKET.get(mediaKey(sessionId, mediaId));
+}
+
+export async function deleteMedia(
+  env: Env,
+  sessionId: string,
+  mediaId: string,
+): Promise<boolean> {
+  if (!mediaId || mediaId.includes("/") || mediaId.includes("..")) return false;
+  const key = mediaKey(sessionId, mediaId);
+  const existing = await env.DIARY_BUCKET.head(key);
+  if (!existing) return false;
+  await env.DIARY_BUCKET.delete(key);
+  return true;
+}
+
+export { MAX_IMAGE_BYTES, ALLOWED_IMAGE_TYPES, mediaKey };
 
 async function touchSession(env: Env, sessionId: string): Promise<void> {
   const reg = await getRegistry(env);

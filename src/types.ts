@@ -15,8 +15,33 @@ export interface Annotation {
   updatedAt: string;
 }
 
+export interface MediaRef {
+  id: string;
+  contentType: string;
+  size: number;
+  createdAt: string;
+  /** Who uploaded this image */
+  author: PersonId;
+}
+
 export interface DiaryEntry {
   body: string;
+  updatedAt: string | null;
+  /** Photos attached to this person's diary column */
+  images?: MediaRef[];
+}
+
+export interface TopicReply {
+  id: string;
+  author: PersonId;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PageTopic {
+  text: string;
+  setBy: PersonId | null;
   updatedAt: string | null;
 }
 
@@ -30,6 +55,9 @@ export interface Page {
     B: DiaryEntry;
   };
   annotations: Annotation[];
+  /** Shared daily discussion prompt for both people */
+  topic?: PageTopic;
+  topicReplies?: TopicReply[];
   createdAt: string;
   updatedAt: string;
 }

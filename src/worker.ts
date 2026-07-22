@@ -2,21 +2,26 @@ import type {
   AdminSessionPayload,
   Annotation,
   Env,
+  MediaRef,
   PersonId,
   SessionPayload,
+  TopicReply,
 } from "./types";
 import { randomId, signSession, verifySession } from "./crypto";
 import {
   createPage,
   createSession,
   defaultConfig,
+  deleteMedia,
   deletePage,
   deleteSession,
   findSessionByPin,
+  getMediaObject,
   getPage,
   getSession,
   listPages,
   listSessions,
+  putMedia,
   savePage,
   sessionToConfig,
   StoreError,
@@ -138,6 +143,56 @@ async function handle(request: Request, env: Env): Promise<Response> {
       return putEntry(request, env, sessionId, pageId, session.person);
     }
 
+    if (method === "PUT" && rest === "/topic") {
+      return putTopic(request, env, sessionId, pageId, session.person);
+    }
+
+    if (method === "POST" && rest === "/topic/replies") {
+      return addTopicReply(request, env, sessionId, pageId, session.person);
+    }
+
+    const topicReplyMatch = rest.match(/^\/topic\/replies\/([^/]+)$/);
+    if (topicReplyMatch) {
+      const replyId = decodeURIComponent(topicReplyMatch[1]!);
+      if (method === "PATCH") {
+        return patchTopicReply(
+          request,
+          env,
+          sessionId,
+          pageId,
+          replyId,
+          session.person,
+        );
+      }
+      if (method === "DELETE") {
+        return removeTopicReply(
+          env,
+          sessionId,
+          pageId,
+          replyId,
+          session.person,
+        );
+      }
+    }
+
+    if (method === "POST" && rest === "/images") {
+      return uploadPageImage(request, env, sessionId, pageId, session.person);
+    }
+
+    const imageMatch = rest.match(/^\/images\/([^/]+)$/);
+    if (imageMatch) {
+      const imageId = decodeURIComponent(imageMatch[1]!);
+      if (method === "DELETE") {
+        return removePageImage(
+          env,
+          sessionId,
+          pageId,
+          imageId,
+          session.person,
+        );
+      }
+    }
+
     if (method === "POST" && rest === "/annotations") {
       return addAnnotation(request, env, sessionId, pageId, session.person);
     }
@@ -159,6 +214,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
         return removeAnnotation(env, sessionId, pageId, annId, session.person);
       }
     }
+  }
+
+  // Media binary: GET /api/media/:id (auth required, session-scoped)
+  const mediaMatch = path.match(/^\/api\/media\/([^/]+)$/);
+  if (mediaMatch && method === "GET") {
+    return serveMedia(env, sessionId, decodeURIComponent(mediaMatch[1]!));
   }
 
   return json({ error: "Not found" }, 404);
@@ -343,6 +404,7 @@ async function adminUpdatePage(
           page.entries[p] = {
             body: ent.body,
             updatedAt: new Date().toISOString(),
+            images: page.entries[p]?.images || [],
           };
         }
       }
@@ -475,12 +537,245 @@ async function putEntry(
     return json({ error: "缺少 body" }, 400);
   }
 
+  const prev = page.entries[target];
   page.entries[target] = {
     body: body.body,
     updatedAt: new Date().toISOString(),
+    images: prev?.images || [],
   };
   const saved = await savePage(env, sessionId, page);
   return json({ page: saved });
+}
+
+async function putTopic(
+  request: Request,
+  env: Env,
+  sessionId: string,
+  pageId: string,
+  person: PersonId,
+): Promise<Response> {
+  const page = await getPage(env, sessionId, pageId);
+  if (!page) return json({ error: "页面不存在" }, 404);
+  const body = await safeJson(request);
+  if (typeof body.text !== "string") {
+    return json({ error: "缺少 text" }, 400);
+  }
+  const text = body.text.trim();
+  if (text.length > 500) {
+    return json({ error: "话题最多 500 字" }, 400);
+  }
+  page.topic = {
+    text,
+    setBy: text ? person : null,
+    updatedAt: text ? new Date().toISOString() : null,
+  };
+  // Clearing topic does not wipe replies unless client asks
+  if (body.clearReplies === true) {
+    page.topicReplies = [];
+  }
+  const saved = await savePage(env, sessionId, page);
+  return json({ page: saved });
+}
+
+async function addTopicReply(
+  request: Request,
+  env: Env,
+  sessionId: string,
+  pageId: string,
+  person: PersonId,
+): Promise<Response> {
+  const page = await getPage(env, sessionId, pageId);
+  if (!page) return json({ error: "页面不存在" }, 404);
+  const body = await safeJson(request);
+  const content = String(body.content ?? "").trim();
+  if (!content) return json({ error: "回复不能为空" }, 400);
+  if (content.length > 2000) return json({ error: "回复最多 2000 字" }, 400);
+  if (!page.topic?.text) {
+    return json({ error: "请先设置今日话题" }, 400);
+  }
+
+  const now = new Date().toISOString();
+  const reply: TopicReply = {
+    id: randomId("tr"),
+    author: person,
+    content,
+    createdAt: now,
+    updatedAt: now,
+  };
+  page.topicReplies = page.topicReplies || [];
+  page.topicReplies.push(reply);
+  const saved = await savePage(env, sessionId, page);
+  return json({ page: saved, reply }, 201);
+}
+
+async function patchTopicReply(
+  request: Request,
+  env: Env,
+  sessionId: string,
+  pageId: string,
+  replyId: string,
+  person: PersonId,
+): Promise<Response> {
+  const page = await getPage(env, sessionId, pageId);
+  if (!page) return json({ error: "页面不存在" }, 404);
+  const replies = page.topicReplies || [];
+  const idx = replies.findIndex((r) => r.id === replyId);
+  if (idx < 0) return json({ error: "回复不存在" }, 404);
+  const reply = replies[idx]!;
+  if (reply.author !== person) {
+    return json({ error: "只能编辑自己的回复" }, 403);
+  }
+  const body = await safeJson(request);
+  if (typeof body.content === "string") {
+    const content = body.content.trim();
+    if (!content) return json({ error: "回复不能为空" }, 400);
+    if (content.length > 2000) return json({ error: "回复最多 2000 字" }, 400);
+    reply.content = content;
+    reply.updatedAt = new Date().toISOString();
+  }
+  replies[idx] = reply;
+  page.topicReplies = replies;
+  const saved = await savePage(env, sessionId, page);
+  return json({ page: saved, reply });
+}
+
+async function removeTopicReply(
+  env: Env,
+  sessionId: string,
+  pageId: string,
+  replyId: string,
+  person: PersonId,
+): Promise<Response> {
+  const page = await getPage(env, sessionId, pageId);
+  if (!page) return json({ error: "页面不存在" }, 404);
+  const replies = page.topicReplies || [];
+  const reply = replies.find((r) => r.id === replyId);
+  if (!reply) return json({ error: "回复不存在" }, 404);
+  if (reply.author !== person) {
+    return json({ error: "只能删除自己的回复" }, 403);
+  }
+  page.topicReplies = replies.filter((r) => r.id !== replyId);
+  const saved = await savePage(env, sessionId, page);
+  return json({ page: saved });
+}
+
+async function uploadPageImage(
+  request: Request,
+  env: Env,
+  sessionId: string,
+  pageId: string,
+  person: PersonId,
+): Promise<Response> {
+  const page = await getPage(env, sessionId, pageId);
+  if (!page) return json({ error: "页面不存在" }, 404);
+
+  const contentTypeHeader = request.headers.get("content-type") || "";
+  let bytes: ArrayBuffer;
+  let contentType = "application/octet-stream";
+  let target: PersonId = person;
+
+  if (contentTypeHeader.includes("multipart/form-data")) {
+    const form = await request.formData();
+    const file = form.get("file");
+    // Workers runtime may type FormDataEntryValue without DOM File; duck-type it.
+    if (
+      !file ||
+      typeof file !== "object" ||
+      typeof (file as Blob).arrayBuffer !== "function"
+    ) {
+      return json({ error: "请选择图片文件（字段名 file）" }, 400);
+    }
+    const blob = file as Blob & { name?: string; type?: string };
+    contentType = blob.type || "application/octet-stream";
+    bytes = await blob.arrayBuffer();
+    const t = form.get("person");
+    if (t === "A" || t === "B") target = t;
+  } else {
+    // raw binary body with Content-Type: image/*
+    contentType = contentTypeHeader.split(";")[0]!.trim() || "application/octet-stream";
+    bytes = await request.arrayBuffer();
+    const url = new URL(request.url);
+    const t = url.searchParams.get("person");
+    if (t === "A" || t === "B") target = t;
+  }
+
+  if (target !== person) {
+    return json({ error: "只能给自己的日记加图" }, 403);
+  }
+
+  const images = page.entries[target].images || [];
+  if (images.length >= 12) {
+    return json({ error: "每侧最多 12 张图片" }, 400);
+  }
+
+  let media: MediaRef;
+  try {
+    media = await putMedia(env, sessionId, {
+      bytes,
+      contentType,
+      author: person,
+    });
+  } catch (err) {
+    if (err instanceof StoreError) {
+      return json({ error: err.message }, err.status);
+    }
+    throw err;
+  }
+
+  images.push(media);
+  page.entries[target] = {
+    ...page.entries[target],
+    images,
+    updatedAt: new Date().toISOString(),
+  };
+  const saved = await savePage(env, sessionId, page);
+  return json({ page: saved, image: media }, 201);
+}
+
+async function removePageImage(
+  env: Env,
+  sessionId: string,
+  pageId: string,
+  imageId: string,
+  person: PersonId,
+): Promise<Response> {
+  const page = await getPage(env, sessionId, pageId);
+  if (!page) return json({ error: "页面不存在" }, 404);
+
+  let foundOn: PersonId | null = null;
+  for (const p of ["A", "B"] as const) {
+    if ((page.entries[p].images || []).some((img) => img.id === imageId)) {
+      foundOn = p;
+      break;
+    }
+  }
+  if (!foundOn) return json({ error: "图片不存在" }, 404);
+  if (foundOn !== person) {
+    return json({ error: "只能删除自己日记里的图片" }, 403);
+  }
+
+  page.entries[foundOn] = {
+    ...page.entries[foundOn],
+    images: (page.entries[foundOn].images || []).filter((img) => img.id !== imageId),
+    updatedAt: new Date().toISOString(),
+  };
+  await deleteMedia(env, sessionId, imageId);
+  const saved = await savePage(env, sessionId, page);
+  return json({ page: saved });
+}
+
+async function serveMedia(
+  env: Env,
+  sessionId: string,
+  mediaId: string,
+): Promise<Response> {
+  const obj = await getMediaObject(env, sessionId, mediaId);
+  if (!obj) return json({ error: "图片不存在" }, 404);
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set("Cache-Control", "private, max-age=31536000, immutable");
+  headers.set("X-Content-Type-Options", "nosniff");
+  return new Response(obj.body, { status: 200, headers });
 }
 
 async function patchPage(

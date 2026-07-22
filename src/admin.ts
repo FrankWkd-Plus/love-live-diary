@@ -819,7 +819,7 @@ export function adminHtml(cfg: ResolvedConfig): string {
 
   $("delete-page").addEventListener("click", async () => {
     if (!state.page || !state.currentSessionId) return;
-    if (!confirm("确定删除这一页？不可恢复。")) return;
+    if (!confirm("确定删除这一页？\\n日记正文与批注将一起消失，且无法恢复。")) return;
     try {
       await api(
         "/api/admin/sessions/" +

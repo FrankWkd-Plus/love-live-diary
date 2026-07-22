@@ -460,10 +460,140 @@ export function appHtml(cfg: ResolvedConfig): string {
     grid-template-columns: 1fr 320px;
     min-height: 0;
     gap: 0;
+    grid-template-rows: auto 1fr;
   }
   @media (max-width: 1100px) {
     .workspace { grid-template-columns: 1fr; }
     #ann-panel { border-left: none; border-top: 1px solid var(--line); }
+  }
+
+  /* Daily topic */
+  .topic-bar {
+    grid-column: 1 / -1;
+    margin: 12px 12px 0;
+    padding: 14px 16px;
+    border: 1px solid rgba(228,216,200,0.95);
+    border-radius: 18px;
+    background:
+      linear-gradient(135deg, rgba(255,248,239,0.95), rgba(245,238,252,0.9));
+    box-shadow: var(--shadow-sm);
+  }
+  .topic-bar h3 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .topic-head {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .topic-text {
+    flex: 1;
+    min-width: 180px;
+    font-family: var(--font);
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--ink);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .topic-text.empty-topic {
+    color: var(--muted);
+    font-style: italic;
+    font-size: 15px;
+  }
+  .topic-edit {
+    width: 100%;
+    min-height: 64px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    resize: vertical;
+    font-family: var(--font);
+    font-size: 16px;
+    outline: none;
+  }
+  .topic-edit:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .topic-meta {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .topic-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    align-items: center;
+  }
+  .topic-replies {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .topic-reply {
+    background: rgba(255,255,255,0.75);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+  .topic-reply .who {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--muted);
+  }
+  .topic-reply .body {
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .topic-reply .foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .topic-reply .foot button {
+    color: var(--muted);
+    text-decoration: underline;
+    font-size: 11px;
+  }
+  .topic-compose {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: flex-end;
+  }
+  .topic-compose textarea {
+    flex: 1;
+    min-height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    resize: vertical;
+    outline: none;
+    font-size: 15px;
+  }
+  .topic-compose .primary {
+    width: auto;
+    margin: 0;
+    padding: 10px 14px;
+    box-shadow: none;
   }
 
   .diaries {
@@ -472,6 +602,7 @@ export function appHtml(cfg: ResolvedConfig): string {
     gap: 0;
     min-height: 0;
     padding: 12px;
+    grid-row: 2;
   }
   @media (max-width: 720px) {
     .diaries { grid-template-columns: 1fr; }
@@ -622,6 +753,118 @@ export function appHtml(cfg: ResolvedConfig): string {
     margin-top: 8px;
     font-size: 12px;
     color: var(--muted);
+  }
+  .media-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .media-item {
+    position: relative;
+    width: 88px;
+    height: 88px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: #f3ebe2;
+    flex: 0 0 auto;
+  }
+  .media-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    cursor: zoom-in;
+  }
+  .media-item .rm {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(42,36,28,0.72);
+    color: #fff;
+    font-size: 14px;
+    line-height: 24px;
+    text-align: center;
+    display: none;
+  }
+  .media-item.mine .rm { display: block; }
+  .media-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
+  }
+  .media-tools .ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .media-tools input[type="file"] {
+    display: none;
+  }
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    background: rgba(20,16,12,0.88);
+    display: none;
+    place-items: center;
+    padding: 20px;
+  }
+  .lightbox.open { display: grid; }
+  .lightbox img {
+    max-width: min(960px, 100%);
+    max-height: min(90dvh, 100%);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .confirm-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(42,36,28,0.45);
+    display: none;
+    place-items: center;
+    padding: 20px;
+    backdrop-filter: blur(3px);
+  }
+  .confirm-mask.open { display: grid; }
+  .confirm-card {
+    width: min(400px, 100%);
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .confirm-card h4 {
+    margin: 0 0 8px;
+    font-family: var(--font);
+    font-size: 18px;
+  }
+  .confirm-card p {
+    margin: 0 0 16px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+  }
+  .confirm-card .row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .confirm-card .primary.danger-solid {
+    width: auto;
+    margin: 0;
+    padding: 10px 14px;
+    background: linear-gradient(180deg, #d46a5a, var(--accent));
+    box-shadow: none;
   }
   .save-row {
     display: flex;
@@ -899,6 +1142,24 @@ export function appHtml(cfg: ResolvedConfig): string {
         </div>
       </div>
       <div id="workspace" class="workspace hidden">
+        <div class="topic-bar" id="topic-bar">
+          <h3>每日话题</h3>
+          <div class="topic-head">
+            <div class="topic-text empty-topic" id="topic-text">还没有话题，写一个今天一起聊的主题吧。</div>
+            <textarea class="topic-edit hidden" id="topic-edit" placeholder="例如：今天最想对对方说的一句话是？" maxlength="500"></textarea>
+          </div>
+          <div class="topic-meta" id="topic-meta"></div>
+          <div class="topic-actions">
+            <button type="button" class="ghost" id="topic-edit-btn">设置话题</button>
+            <button type="button" class="primary hidden" id="topic-save-btn" style="width:auto;margin:0;padding:8px 12px;box-shadow:none">保存话题</button>
+            <button type="button" class="ghost hidden" id="topic-cancel-btn">取消</button>
+          </div>
+          <div class="topic-replies" id="topic-replies"></div>
+          <div class="topic-compose">
+            <textarea id="topic-reply-input" placeholder="写下你对这个话题的想法……" maxlength="2000"></textarea>
+            <button type="button" class="primary" id="topic-reply-btn">回复</button>
+          </div>
+        </div>
         <div class="diaries">
           <div class="col a" id="col-a">
             <div class="col-head">
@@ -909,12 +1170,20 @@ export function appHtml(cfg: ResolvedConfig): string {
             <div class="editor-wrap">
               <div class="body-view" id="view-a" data-target="A"></div>
               <textarea class="body-edit hidden" id="edit-area-a" data-target="A" placeholder="写下这一天……"></textarea>
+              <div class="media-row" id="media-a"></div>
+              <div class="media-tools hidden" id="media-tools-a">
+                <label class="ghost">
+                  📷 相册/拍照
+                  <input type="file" id="file-a" accept="image/*" />
+                </label>
+                <button type="button" class="ghost" id="paste-a">📋 粘贴图片</button>
+              </div>
               <div class="save-row hidden" id="save-row-a">
                 <span class="status" id="status-a"></span>
                 <button type="button" class="ghost" id="cancel-a">取消</button>
                 <button type="button" class="primary" style="width:auto;margin:0;padding:8px 14px" id="save-a">保存</button>
               </div>
-              <div class="hint" id="hint-a">选中文字可添加批注</div>
+              <div class="hint" id="hint-a">选中文字可添加批注；可添加照片</div>
             </div>
           </div>
           <div class="col b" id="col-b">
@@ -926,12 +1195,20 @@ export function appHtml(cfg: ResolvedConfig): string {
             <div class="editor-wrap">
               <div class="body-view" id="view-b" data-target="B"></div>
               <textarea class="body-edit hidden" id="edit-area-b" data-target="B" placeholder="写下这一天……"></textarea>
+              <div class="media-row" id="media-b"></div>
+              <div class="media-tools hidden" id="media-tools-b">
+                <label class="ghost">
+                  📷 相册/拍照
+                  <input type="file" id="file-b" accept="image/*" />
+                </label>
+                <button type="button" class="ghost" id="paste-b">📋 粘贴图片</button>
+              </div>
               <div class="save-row hidden" id="save-row-b">
                 <span class="status" id="status-b"></span>
                 <button type="button" class="ghost" id="cancel-b">取消</button>
                 <button type="button" class="primary" style="width:auto;margin:0;padding:8px 14px" id="save-b">保存</button>
               </div>
-              <div class="hint" id="hint-b">选中文字可添加批注</div>
+              <div class="hint" id="hint-b">选中文字可添加批注；可添加照片</div>
             </div>
           </div>
         </div>
@@ -955,6 +1232,21 @@ export function appHtml(cfg: ResolvedConfig): string {
     <div class="tip-arrow"></div>
   </div>
 
+  <div id="lightbox" class="lightbox" aria-hidden="true">
+    <img id="lightbox-img" alt="预览" />
+  </div>
+
+  <div id="confirm-mask" class="confirm-mask" aria-hidden="true">
+    <div class="confirm-card">
+      <h4 id="confirm-title">确认</h4>
+      <p id="confirm-msg"></p>
+      <div class="row">
+        <button type="button" class="ghost" id="confirm-cancel">取消</button>
+        <button type="button" class="primary danger-solid" id="confirm-ok">删除</button>
+      </div>
+    </div>
+  </div>
+
   <div id="composer">
     <div class="composer-card">
       <h4 id="composer-title">添加批注</h4>
@@ -975,8 +1267,11 @@ export function appHtml(cfg: ResolvedConfig): string {
 
   /** @typedef {"A"|"B"} PersonId */
   /** @typedef {{ id:string, author:PersonId, target:PersonId, start:number, end:number, quote:string, content:string, createdAt:string, updatedAt:string }} Annotation */
-  /** @typedef {{ body:string, updatedAt:string|null }} DiaryEntry */
-  /** @typedef {{ id:string, date:string, title:string, entries:{A:DiaryEntry,B:DiaryEntry}, annotations:Annotation[], createdAt:string, updatedAt:string }} Page */
+  /** @typedef {{ id:string, contentType:string, size:number, createdAt:string, author:PersonId }} MediaRef */
+  /** @typedef {{ body:string, updatedAt:string|null, images?:MediaRef[] }} DiaryEntry */
+  /** @typedef {{ id:string, author:PersonId, content:string, createdAt:string, updatedAt:string }} TopicReply */
+  /** @typedef {{ text:string, setBy:PersonId|null, updatedAt:string|null }} PageTopic */
+  /** @typedef {{ id:string, date:string, title:string, entries:{A:DiaryEntry,B:DiaryEntry}, annotations:Annotation[], topic?:PageTopic, topicReplies?:TopicReply[], createdAt:string, updatedAt:string }} Page */
   /** @typedef {{ id:string, date:string, title:string, updatedAt:string }} PageSummary */
 
   const state = {
@@ -1016,6 +1311,57 @@ export function appHtml(cfg: ResolvedConfig): string {
   const sidebar = $("sidebar");
   const backdrop = $("backdrop");
   let annTipHideTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
+
+  const lightbox = $("lightbox");
+  const lightboxImg = /** @type {HTMLImageElement} */ ($("lightbox-img"));
+  const confirmMask = $("confirm-mask");
+  let confirmResolver = /** @type {null | ((ok:boolean)=>void)} */ (null);
+  let topicEditing = false;
+
+  function askConfirm(title, message, okLabel) {
+    return new Promise((resolve) => {
+      $("confirm-title").textContent = title || "确认";
+      $("confirm-msg").textContent = message || "";
+      $("confirm-ok").textContent = okLabel || "删除";
+      confirmResolver = resolve;
+      confirmMask.classList.add("open");
+      confirmMask.setAttribute("aria-hidden", "false");
+    });
+  }
+  function closeConfirm(ok) {
+    confirmMask.classList.remove("open");
+    confirmMask.setAttribute("aria-hidden", "true");
+    const r = confirmResolver;
+    confirmResolver = null;
+    if (r) r(!!ok);
+  }
+  $("confirm-cancel").addEventListener("click", () => closeConfirm(false));
+  $("confirm-ok").addEventListener("click", () => closeConfirm(true));
+  confirmMask.addEventListener("click", (e) => {
+    if (e.target === confirmMask) closeConfirm(false);
+  });
+
+  function mediaUrl(id) {
+    return "/api/media/" + encodeURIComponent(id);
+  }
+
+  function openLightbox(src) {
+    lightboxImg.src = src;
+    lightbox.classList.add("open");
+    lightbox.setAttribute("aria-hidden", "false");
+  }
+  function closeLightbox() {
+    lightbox.classList.remove("open");
+    lightbox.setAttribute("aria-hidden", "true");
+    lightboxImg.removeAttribute("src");
+  }
+  lightbox.addEventListener("click", closeLightbox);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeLightbox();
+      if (confirmMask.classList.contains("open")) closeConfirm(false);
+    }
+  });
 
   async function api(path, opts = {}) {
     const res = await fetch(path, {
@@ -1255,6 +1601,7 @@ export function appHtml(cfg: ResolvedConfig): string {
     state.page = data.page;
     state.editing = null;
     state.activeAnnId = null;
+    topicEditing = false;
     blank.classList.add("hidden");
     workspace.classList.remove("hidden");
     pageTitleEl.textContent = state.page.title || state.page.date;
@@ -1264,6 +1611,7 @@ export function appHtml(cfg: ResolvedConfig): string {
     renderPageList();
     renderDiaries();
     renderAnnotations();
+    renderTopic();
   }
 
   $("new-page").addEventListener("click", async () => {
@@ -1284,7 +1632,12 @@ export function appHtml(cfg: ResolvedConfig): string {
 
   $("delete-btn").addEventListener("click", async () => {
     if (!state.currentId) return;
-    if (!confirm("确定删除这一页？批注也会一起消失。")) return;
+    const ok = await askConfirm(
+      "删除这一页？",
+      "日记正文、图片、批注和话题讨论都会一起消失，且无法恢复。",
+      "删除此页",
+    );
+    if (!ok) return;
     try {
       await api("/api/pages/" + encodeURIComponent(state.currentId), { method: "DELETE" });
       state.pages = state.pages.filter((p) => p.id !== state.currentId);
@@ -1354,23 +1707,267 @@ export function appHtml(cfg: ResolvedConfig): string {
   function renderDiaries() {
     if (!state.page) return;
     for (const p of /** @type {PersonId[]} */ (["A", "B"])) {
-      const entry = state.page.entries[p] || { body: "", updatedAt: null };
+      const entry = state.page.entries[p] || { body: "", updatedAt: null, images: [] };
       $("meta-" + p.toLowerCase()).textContent = "更新于 " + fmtTime(entry.updatedAt);
       const view = $("view-" + p.toLowerCase());
       const area = /** @type {HTMLTextAreaElement} */ ($("edit-area-" + p.toLowerCase()));
       const saveRow = $("save-row-" + p.toLowerCase());
+      const tools = $("media-tools-" + p.toLowerCase());
       const isEditing = state.editing === p;
       view.classList.toggle("hidden", isEditing);
       area.classList.toggle("hidden", !isEditing);
       saveRow.classList.toggle("hidden", !isEditing);
+      tools.classList.toggle("hidden", !(isEditing && state.person === p));
       if (isEditing) {
         area.value = entry.body || "";
       } else {
         view.innerHTML = renderHighlighted(entry.body || "", p);
         bindMarks(view);
       }
+      renderMedia(p);
     }
   }
+
+  function renderMedia(p) {
+    const box = $("media-" + p.toLowerCase());
+    box.innerHTML = "";
+    if (!state.page) return;
+    const images = (state.page.entries[p] && state.page.entries[p].images) || [];
+    for (const img of images) {
+      const wrap = document.createElement("div");
+      wrap.className = "media-item" + (img.author === state.person ? " mine" : "");
+      const el = document.createElement("img");
+      el.src = mediaUrl(img.id);
+      el.alt = "日记图片";
+      el.loading = "lazy";
+      el.addEventListener("click", () => openLightbox(mediaUrl(img.id)));
+      wrap.appendChild(el);
+      if (img.author === state.person) {
+        const rm = document.createElement("button");
+        rm.type = "button";
+        rm.className = "rm";
+        rm.title = "删除图片";
+        rm.textContent = "×";
+        rm.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const ok = await askConfirm("删除这张图片？", "删除后无法恢复。", "删除图片");
+          if (!ok || !state.page) return;
+          try {
+            const data = await api(
+              "/api/pages/" + encodeURIComponent(state.page.id) + "/images/" + encodeURIComponent(img.id),
+              { method: "DELETE" },
+            );
+            state.page = data.page;
+            renderDiaries();
+          } catch (err) {
+            alert(err.message || "删除失败");
+          }
+        });
+        wrap.appendChild(rm);
+      }
+      box.appendChild(wrap);
+    }
+  }
+
+  async function uploadImageFile(p, file) {
+    if (!state.page || state.person !== p || !file) return;
+    if (!String(file.type || "").startsWith("image/")) {
+      alert("请选择图片文件");
+      return;
+    }
+    const status = $("status-" + p.toLowerCase());
+    status.textContent = "上传中…";
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name || "photo.jpg");
+      fd.append("person", p);
+      const res = await fetch(
+        "/api/pages/" + encodeURIComponent(state.page.id) + "/images",
+        { method: "POST", body: fd, credentials: "same-origin" },
+      );
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = { error: text }; }
+      if (!res.ok) throw new Error((data && data.error) || "上传失败");
+      state.page = data.page;
+      status.textContent = "";
+      renderDiaries();
+    } catch (e) {
+      status.textContent = e.message || "上传失败";
+      alert(e.message || "上传失败");
+    }
+  }
+
+  async function pasteImageFromClipboard(p) {
+    if (!state.page || state.person !== p) return;
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.read) {
+        alert("当前环境不支持读取剪贴板图片，请用「相册/拍照」选择。");
+        return;
+      }
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (!type) continue;
+        const blob = await item.getType(type);
+        const file = new File([blob], "clipboard." + (type.split("/")[1] || "png"), { type });
+        await uploadImageFile(p, file);
+        return;
+      }
+      alert("剪贴板里没有图片。可先截图/复制图片后再试。");
+    } catch (e) {
+      alert((e && e.message) || "无法读取剪贴板，请改用相册选择。");
+    }
+  }
+
+  for (const p of /** @type {PersonId[]} */ (["A", "B"])) {
+    const fileInput = /** @type {HTMLInputElement} */ ($("file-" + p.toLowerCase()));
+    fileInput.addEventListener("change", async () => {
+      const f = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if (f) await uploadImageFile(p, f);
+    });
+    $("paste-" + p.toLowerCase()).addEventListener("click", () => pasteImageFromClipboard(p));
+    const area = /** @type {HTMLTextAreaElement} */ ($("edit-area-" + p.toLowerCase()));
+    area.addEventListener("paste", async (e) => {
+      if (state.editing !== p || state.person !== p) return;
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const it of items) {
+        if (it.type && it.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = it.getAsFile();
+          if (file) await uploadImageFile(p, file);
+          return;
+        }
+      }
+    });
+  }
+
+  /* ---------- Topic ---------- */
+  function renderTopic() {
+    if (!state.page) return;
+    const topic = state.page.topic || { text: "", setBy: null, updatedAt: null };
+    const textEl = $("topic-text");
+    const editEl = /** @type {HTMLTextAreaElement} */ ($("topic-edit"));
+    const meta = $("topic-meta");
+    if (topicEditing) {
+      textEl.classList.add("hidden");
+      editEl.classList.remove("hidden");
+      $("topic-edit-btn").classList.add("hidden");
+      $("topic-save-btn").classList.remove("hidden");
+      $("topic-cancel-btn").classList.remove("hidden");
+      editEl.value = topic.text || "";
+    } else {
+      textEl.classList.remove("hidden");
+      editEl.classList.add("hidden");
+      $("topic-edit-btn").classList.remove("hidden");
+      $("topic-save-btn").classList.add("hidden");
+      $("topic-cancel-btn").classList.add("hidden");
+      if (topic.text) {
+        textEl.textContent = topic.text;
+        textEl.classList.remove("empty-topic");
+      } else {
+        textEl.textContent = "还没有话题，写一个今天一起聊的主题吧。";
+        textEl.classList.add("empty-topic");
+      }
+    }
+    if (topic.text && topic.setBy) {
+      meta.textContent = "由 " + nameOf(topic.setBy) + " 更新 · " + fmtTime(topic.updatedAt);
+    } else {
+      meta.textContent = "";
+    }
+    $("topic-edit-btn").textContent = topic.text ? "修改话题" : "设置话题";
+
+    const box = $("topic-replies");
+    box.innerHTML = "";
+    const replies = (state.page.topicReplies || []).slice().sort((a, b) =>
+      (a.createdAt || "").localeCompare(b.createdAt || ""),
+    );
+    for (const r of replies) {
+      const card = document.createElement("div");
+      card.className = "topic-reply";
+      const who = document.createElement("div");
+      who.className = "who";
+      who.textContent = nameOf(r.author);
+      const body = document.createElement("div");
+      body.className = "body";
+      body.textContent = r.content || "";
+      const foot = document.createElement("div");
+      foot.className = "foot";
+      const left = document.createElement("span");
+      left.textContent = fmtTime(r.createdAt);
+      foot.appendChild(left);
+      if (r.author === state.person) {
+        const actions = document.createElement("span");
+        const del = document.createElement("button");
+        del.type = "button";
+        del.textContent = "删除";
+        del.addEventListener("click", async () => {
+          const ok = await askConfirm("删除这条回复？", "删除后无法恢复。", "删除回复");
+          if (!ok || !state.page) return;
+          try {
+            const data = await api(
+              "/api/pages/" + encodeURIComponent(state.page.id) + "/topic/replies/" + encodeURIComponent(r.id),
+              { method: "DELETE" },
+            );
+            state.page = data.page;
+            renderTopic();
+          } catch (e) {
+            alert(e.message || "删除失败");
+          }
+        });
+        actions.appendChild(del);
+        foot.appendChild(actions);
+      }
+      card.appendChild(who);
+      card.appendChild(body);
+      card.appendChild(foot);
+      box.appendChild(card);
+    }
+  }
+
+  $("topic-edit-btn").addEventListener("click", () => {
+    topicEditing = true;
+    renderTopic();
+    $("topic-edit").focus();
+  });
+  $("topic-cancel-btn").addEventListener("click", () => {
+    topicEditing = false;
+    renderTopic();
+  });
+  $("topic-save-btn").addEventListener("click", async () => {
+    if (!state.page) return;
+    const text = /** @type {HTMLTextAreaElement} */ ($("topic-edit")).value;
+    try {
+      const data = await api(
+        "/api/pages/" + encodeURIComponent(state.page.id) + "/topic",
+        { method: "PUT", body: JSON.stringify({ text }) },
+      );
+      state.page = data.page;
+      topicEditing = false;
+      renderTopic();
+    } catch (e) {
+      alert(e.message || "保存话题失败");
+    }
+  });
+  $("topic-reply-btn").addEventListener("click", async () => {
+    if (!state.page) return;
+    const input = /** @type {HTMLTextAreaElement} */ ($("topic-reply-input"));
+    const content = input.value.trim();
+    if (!content) { alert("请先写点什么"); return; }
+    try {
+      const data = await api(
+        "/api/pages/" + encodeURIComponent(state.page.id) + "/topic/replies",
+        { method: "POST", body: JSON.stringify({ content }) },
+      );
+      state.page = data.page;
+      input.value = "";
+      renderTopic();
+    } catch (e) {
+      alert(e.message || "发送失败");
+    }
+  });
 
   /**
    * Build highlighted HTML for a diary body using annotations on that target.
@@ -1567,6 +2164,7 @@ export function appHtml(cfg: ResolvedConfig): string {
       if (idx >= 0) state.pages[idx].updatedAt = state.page.updatedAt;
       renderDiaries();
       renderAnnotations();
+      renderTopic();
     } catch (e) {
       status.textContent = e.message || "保存失败";
     }
@@ -1770,7 +2368,8 @@ export function appHtml(cfg: ResolvedConfig): string {
         delBtn.textContent = "删除";
         delBtn.addEventListener("click", async (e) => {
           e.stopPropagation();
-          if (!confirm("删除这条批注？")) return;
+          const ok = await askConfirm("删除这条批注？", "删除后无法恢复。", "删除批注");
+          if (!ok) return;
           try {
             const data = await api(
               "/api/pages/" + encodeURIComponent(state.page.id) + "/annotations/" + encodeURIComponent(a.id),
