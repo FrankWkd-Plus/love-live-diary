@@ -1183,7 +1183,7 @@ export function appHtml(cfg: ResolvedConfig): string {
                 <button type="button" class="ghost" id="cancel-a">取消</button>
                 <button type="button" class="primary" style="width:auto;margin:0;padding:8px 14px" id="save-a">保存</button>
               </div>
-              <div class="hint" id="hint-a">选中文字可添加批注；可添加照片</div>
+              <div class="hint" id="hint-a">选中文字可添加批注；可添加照片；停笔约 45 秒自动保存</div>
             </div>
           </div>
           <div class="col b" id="col-b">
@@ -1208,7 +1208,7 @@ export function appHtml(cfg: ResolvedConfig): string {
                 <button type="button" class="ghost" id="cancel-b">取消</button>
                 <button type="button" class="primary" style="width:auto;margin:0;padding:8px 14px" id="save-b">保存</button>
               </div>
-              <div class="hint" id="hint-b">选中文字可添加批注；可添加照片</div>
+              <div class="hint" id="hint-b">选中文字可添加批注；可添加照片；停笔约 45 秒自动保存</div>
             </div>
           </div>
         </div>
@@ -1535,11 +1535,11 @@ export function appHtml(cfg: ResolvedConfig): string {
     $("col-b").classList.toggle("readonly", mine !== "B");
     $("hint-a").textContent =
       mine === "A"
-        ? "点「编辑」写日记；退出编辑后选中文字可批注（含自己）"
+        ? "点「编辑」写日记；停笔约 45 秒自动保存；可加照片；退出后可划词批注"
         : "选中文字可添加批注；悬停高亮可预览";
     $("hint-b").textContent =
       mine === "B"
-        ? "点「编辑」写日记；退出编辑后选中文字可批注（含自己）"
+        ? "点「编辑」写日记；停笔约 45 秒自动保存；可加照片；退出后可划词批注"
         : "选中文字可添加批注；悬停高亮可预览";
   }
 
@@ -2130,8 +2130,35 @@ export function appHtml(cfg: ResolvedConfig): string {
   $("edit-b").addEventListener("click", () => startEdit("B"));
   $("cancel-a").addEventListener("click", () => cancelEdit("A"));
   $("cancel-b").addEventListener("click", () => cancelEdit("B"));
-  $("save-a").addEventListener("click", () => saveEntry("A"));
-  $("save-b").addEventListener("click", () => saveEntry("B"));
+  $("save-a").addEventListener("click", () => saveEntry("A", { exitEdit: true }));
+  $("save-b").addEventListener("click", () => saveEntry("B", { exitEdit: true }));
+
+  // Autosave: long idle debounce to spare R2 Class A writes.
+  // - 45s after last keystroke
+  // - also flush on blur / page hide / beforeunload when dirty
+  const AUTOSAVE_MS = 45000;
+  /** @type {Record<string, ReturnType<typeof setTimeout>|null>} */
+  const autosaveTimers = { A: null, B: null };
+  /** @type {Record<string, string>} last successfully saved body snapshot */
+  const savedBodySnap = { A: "", B: "" };
+  /** @type {Record<string, boolean>} */
+  const saving = { A: false, B: false };
+
+  function clearAutosave(p) {
+    if (autosaveTimers[p]) {
+      clearTimeout(autosaveTimers[p]);
+      autosaveTimers[p] = null;
+    }
+  }
+
+  function scheduleAutosave(p) {
+    if (state.person !== p || state.editing !== p) return;
+    clearAutosave(p);
+    autosaveTimers[p] = setTimeout(() => {
+      autosaveTimers[p] = null;
+      saveEntry(p, { exitEdit: false, silent: true, reason: "autosave" });
+    }, AUTOSAVE_MS);
+  }
 
   function startEdit(p) {
     if (state.person !== p || !state.page) return;
@@ -2139,36 +2166,112 @@ export function appHtml(cfg: ResolvedConfig): string {
     hideSelBar();
     renderDiaries();
     const area = /** @type {HTMLTextAreaElement} */ ($("edit-area-" + p.toLowerCase()));
+    savedBodySnap[p] =
+      (state.page.entries[p] && state.page.entries[p].body) || "";
     area.focus();
   }
+
   function cancelEdit(p) {
     if (state.editing !== p) return;
+    clearAutosave(p);
     state.editing = null;
     renderDiaries();
   }
-  async function saveEntry(p) {
+
+  /**
+   * @param {PersonId} p
+   * @param {{ exitEdit?: boolean, silent?: boolean, reason?: string }} [opts]
+   */
+  async function saveEntry(p, opts = {}) {
+    const exitEdit = opts.exitEdit !== false; // default true for manual save
+    const silent = !!opts.silent;
     if (!state.page || state.person !== p) return;
+    if (saving[p]) return;
+
     const area = /** @type {HTMLTextAreaElement} */ ($("edit-area-" + p.toLowerCase()));
+    // When not in edit mode, nothing to pull from textarea
+    const body =
+      state.editing === p
+        ? area.value
+        : (state.page.entries[p] && state.page.entries[p].body) || "";
+
+    // Skip no-op writes (important for R2 quota)
+    if (body === savedBodySnap[p]) {
+      if (!silent) {
+        const status = $("status-" + p.toLowerCase());
+        status.textContent = "已是最新";
+        setTimeout(() => {
+          if (status.textContent === "已是最新") status.textContent = "";
+        }, 1200);
+      }
+      if (exitEdit) {
+        clearAutosave(p);
+        state.editing = null;
+        renderDiaries();
+      }
+      return;
+    }
+
     const status = $("status-" + p.toLowerCase());
-    status.textContent = "保存中…";
+    saving[p] = true;
+    status.textContent = silent ? "自动保存中…" : "保存中…";
     try {
       const data = await api(
         "/api/pages/" + encodeURIComponent(state.page.id) + "/entry",
-        { method: "PUT", body: JSON.stringify({ person: p, body: area.value }) },
+        { method: "PUT", body: JSON.stringify({ person: p, body }) },
       );
       state.page = data.page;
-      state.editing = null;
-      status.textContent = "";
-      // refresh list updatedAt
+      savedBodySnap[p] = body;
+      clearAutosave(p);
+      if (exitEdit) state.editing = null;
+      status.textContent = silent
+        ? "已自动保存 " + new Date().toLocaleTimeString("zh-CN", { hour12: false })
+        : "已保存";
+      setTimeout(() => {
+        if (status.textContent.startsWith("已")) status.textContent = "";
+      }, 2500);
       const idx = state.pages.findIndex((x) => x.id === state.page.id);
       if (idx >= 0) state.pages[idx].updatedAt = state.page.updatedAt;
-      renderDiaries();
-      renderAnnotations();
-      renderTopic();
+      // Keep caret if still editing; only full re-render when exiting
+      if (exitEdit || state.editing !== p) {
+        renderDiaries();
+        renderAnnotations();
+        renderTopic();
+      } else {
+        $("meta-" + p.toLowerCase()).textContent =
+          "更新于 " + fmtTime(state.page.entries[p].updatedAt);
+      }
     } catch (e) {
       status.textContent = e.message || "保存失败";
+      // retry later if autosave failed and still editing
+      if (silent && state.editing === p) scheduleAutosave(p);
+    } finally {
+      saving[p] = false;
     }
   }
+
+  for (const p of /** @type {PersonId[]} */ (["A", "B"])) {
+    const area = /** @type {HTMLTextAreaElement} */ ($("edit-area-" + p.toLowerCase()));
+    area.addEventListener("input", () => {
+      if (state.editing === p && state.person === p) scheduleAutosave(p);
+    });
+    area.addEventListener("blur", () => {
+      // Flush pending edits when leaving the field (still longer than typing debounce)
+      if (state.editing === p && state.person === p) {
+        clearAutosave(p);
+        saveEntry(p, { exitEdit: false, silent: true, reason: "blur" });
+      }
+    });
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "hidden") return;
+    if (state.editing && state.person === state.editing) {
+      clearAutosave(state.editing);
+      // fire-and-forget; browser may kill it, but better than nothing
+      saveEntry(state.editing, { exitEdit: false, silent: true, reason: "hide" });
+    }
+  });
 
   /* ---------- Selection → annotation ---------- */
   document.addEventListener("mouseup", onSelectionChange);
